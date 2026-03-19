@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  name          String?
+  avatarUrl     String?     @map("avatar_url")
+  githubId      String?     @unique @map("github_id")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  
+  endpoints     Endpoint[]
+  
+  @@map("users")
+}
+
+model Endpoint {
+  id              String      @id @default(cuid())
+  userId          String      @map("user_id")
+  slug            String      @unique
+  name            String
+  description     String?
+  isActive        Boolean     @default(true) @map("is_active")
+  forwardingUrl   String?     @map("forwarding_url")
+  secretKey       String      @map("secret_key")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events          WebhookEvent[]
+  replayLogs      ReplayLog[]
+  
+  @@index([userId])
+  @@map("endpoints")
+}
+
+model WebhookEvent {
+  id                String      @id @default(cuid())
+  endpointId        String      @map("endpoint_id")
+  method            String
+  headers           Json
+  body              String
+  queryParams       Json?       @map("query_params")
+  sourceIp          String?     @map("source_ip")
+  contentType       String?     @map("content_type")
+  signatureStatus   String?     @map("signature_status")
+  aiAnalysis        Json?       @map("ai_analysis")
+  receivedAt        DateTime    @default(now()) @map("received_at")
+  
+  endpoint          Endpoint    @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  replayLogs        ReplayLog[]
+  
+  @@index([endpointId, receivedAt])
+  @@map("webhook_events")
+}
+
+model ReplayLog {
+  id                String      @id @default(cuid())
+  eventId           String      @map("event_id")
+  endpointId        String      @map("endpoint_id")
+  targetUrl         String      @map("target_url")
+  responseStatus    Int?        @map("response_status")
+  responseBody      String?     @map("response_body")
+  responseHeaders   Json?       @map("response_headers")
+  latencyMs         Int?        @map("latency_ms")
+  error             String?
+  replayedAt        DateTime    @default(now()) @map("replayed_at")
+  
+  event             WebhookEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  endpoint          Endpoint     @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  
+  @@index([eventId])
+  @@index([endpointId])
+  @@map("replay_logs")
+}

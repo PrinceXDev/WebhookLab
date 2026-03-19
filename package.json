@@ -1,0 +1,27 @@
+{
+  "name": "webhooklab",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "db:init": "Get-Content scripts/init-db.sql | docker exec -i webhooklab-postgres psql -U webhooklab -d webhooklab && cd apps/server && pnpm prisma generate",
+    "db:push": "pwsh scripts/sync-prisma-schema.ps1",
+    "db:studio": "cd apps/server && pnpm prisma studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@10.28.2"
+}

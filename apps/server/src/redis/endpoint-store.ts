@@ -1,0 +1,76 @@
+import { redisClient } from './client.js';
+
+export interface StoredEndpoint {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  forwardingUrl: string | null;
+  secretKey: string;
+  userId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function storeEndpoint(endpoint: StoredEndpoint): Promise<void> {
+  const key = `endpoint:${endpoint.id}`;
+  const slugKey = `endpoint:slug:${endpoint.slug}`;
+  
+  await redisClient.set(key, JSON.stringify(endpoint));
+  await redisClient.set(slugKey, endpoint.id);
+  
+  await redisClient.sAdd('endpoints:all', endpoint.id);
+}
+
+export async function getEndpoints(): Promise<StoredEndpoint[]> {
+  const endpointIds = await redisClient.sMembers('endpoints:all');
+  
+  if (endpointIds.length === 0) {
+    return [];
+  }
+  
+  const endpoints: StoredEndpoint[] = [];
+  
+  for (const id of endpointIds) {
+    const key = `endpoint:${id}`;
+    const data = await redisClient.get(key);
+    if (data) {
+      endpoints.push(JSON.parse(data));
+    }
+  }
+  
+  endpoints.sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  
+  return endpoints;
+}
+
+export async function getEndpointBySlug(slug: string): Promise<StoredEndpoint | null> {
+  const slugKey = `endpoint:slug:${slug}`;
+  const endpointId = await redisClient.get(slugKey);
+  
+  if (!endpointId) {
+    return null;
+  }
+  
+  const key = `endpoint:${endpointId}`;
+  const data = await redisClient.get(key);
+  
+  return data ? JSON.parse(data) : null;
+}
+
+export async function deleteEndpoint(id: string): Promise<void> {
+  const key = `endpoint:${id}`;
+  const endpoint = await redisClient.get(key);
+  
+  if (endpoint) {
+    const parsed = JSON.parse(endpoint);
+    const slugKey = `endpoint:slug:${parsed.slug}`;
+    await redisClient.del(slugKey);
+  }
+  
+  await redisClient.del(key);
+  await redisClient.sRem('endpoints:all', id);
+}
