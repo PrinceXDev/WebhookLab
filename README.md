@@ -6,6 +6,8 @@ A real-time webhook inspector and replay engine with AI-powered payload analysis
 
 ## Features
 
+- **GitHub OAuth Authentication**: Secure sign-in with NextAuth.js
+- **User-Scoped Endpoints**: Each user manages their own webhook endpoints
 - **Real-time Dashboard**: Webhooks appear live via WebSocket in under 50ms
 - **Unique Endpoints**: Generate unique URLs for each integration
 - **Event Inspector**: Full headers, body, query params, and metadata
@@ -17,16 +19,17 @@ A real-time webhook inspector and replay engine with AI-powered payload analysis
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui |
-| **Backend** | Express.js, Socket.IO, TypeScript |
-| **Database** | PostgreSQL (via Prisma ORM) |
-| **Cache** | Redis (event store, pub/sub, rate limiting) |
-| **Real-time** | WebSocket (Socket.IO) |
-| **AI** | Claude AI (Anthropic API) |
-| **Monorepo** | pnpm workspaces + Turborepo |
-| **Infrastructure** | Docker Compose (local), Vercel (frontend), Railway (backend) |
+| Layer              | Technology                                                             |
+| ------------------ | ---------------------------------------------------------------------- |
+| **Frontend**       | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui |
+| **Backend**        | Express.js, Socket.IO, TypeScript                                      |
+| **Auth**           | NextAuth.js with GitHub OAuth                                          |
+| **Database**       | PostgreSQL (via Prisma ORM)                                            |
+| **Cache**          | Redis (event store, pub/sub, rate limiting)                            |
+| **Real-time**      | WebSocket (Socket.IO)                                                  |
+| **AI**             | Claude AI (Anthropic API)                                              |
+| **Monorepo**       | pnpm workspaces + Turborepo                                            |
+| **Infrastructure** | Docker Compose (local), Vercel (frontend), Railway (backend)           |
 
 ---
 
@@ -49,30 +52,21 @@ Before you start, make sure you have these installed:
 pnpm install
 ```
 
-### 2. Set Up Environment Variables
+### 2. Set Up GitHub OAuth
 
-**Backend** (`apps/server/.env`):
-```bash
-# Already created with default values
-# You can leave it as-is for local development
-```
+Follow the detailed guide in [AUTH_SETUP.md](./AUTH_SETUP.md) to:
 
-**Frontend** (`apps/web/.env.local`):
-```bash
-# IMPORTANT: Replace these with your actual values!
+1. Create a GitHub OAuth application
+2. Generate NEXTAUTH_SECRET
+3. Configure environment variables
 
-# Generate a secret:
-# Run: openssl rand -base64 32
-NEXTAUTH_SECRET=your-generated-secret-here
+**Quick version:**
 
-# Paste your GitHub OAuth credentials:
-GITHUB_CLIENT_ID=your-github-client-id
-GITHUB_CLIENT_SECRET=your-github-client-secret
-
-# API URLs (leave as-is for local dev)
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_WS_URL=http://localhost:4000
-```
+- Create OAuth app at https://github.com/settings/developers
+- Set callback URL: `http://localhost:3000/api/auth/callback/github`
+- Copy Client ID and Secret
+- Generate secret: `openssl rand -base64 32`
+- Update `apps/web/.env.local` and `apps/server/.env`
 
 ### 3. Start Docker Services
 
@@ -106,6 +100,7 @@ pnpm dev
 ```
 
 This starts:
+
 - **Frontend**: http://localhost:3000
 - **Backend**: http://localhost:4000
 
@@ -168,7 +163,7 @@ Webhook Provider (Stripe, GitHub, etc.)
         │
         ▼
   Browser Dashboard (live update via WebSocket)
-        
+
   Total latency: < 50ms end-to-end
 ```
 
@@ -318,27 +313,6 @@ pnpm prisma generate
 pnpm prisma db push --force-reset
 ```
 
----
-
-## Phase 1 Learning Path
-
-| Day | Focus | What You'll Build |
-|---|---|---|
-| **Day 1** | Docker, Redis basics | Start services, test Redis CLI |
-| **Day 2** | Express + TypeScript | Webhook ingestion route |
-| **Day 3** | Redis sorted sets | Event storage with TTL |
-| **Day 4** | Socket.IO | Real-time push to dashboard |
-| **Day 5** | Next.js App Router | Dashboard shell |
-| **Day 6** | shadcn/ui components | Event list, inspector UI |
-| **Day 7** | WebSocket client | Live event feed |
-| **Day 8** | NextAuth.js | GitHub OAuth login |
-| **Day 9** | Prisma ORM | Endpoint CRUD operations |
-| **Day 10** | BullMQ | Replay engine with retry |
-| **Day 11** | Webhook signatures | HMAC verification |
-| **Day 12** | Polish | Filtering, search, pagination |
-
----
-
 ## Next Steps
 
 1. **Fill in your environment variables** in `apps/web/.env.local`
@@ -347,20 +321,3 @@ pnpm prisma db push --force-reset
 4. **Push database schema** with `pnpm db:push`
 5. **Start dev servers** with `pnpm dev`
 6. **Test it** by creating an endpoint and sending a webhook
-
----
-
-## Resources
-
-- [Next.js App Router Docs](https://nextjs.org/docs/app)
-- [Express.js Guide](https://expressjs.com/en/guide/routing.html)
-- [Socket.IO Documentation](https://socket.io/docs/v4/)
-- [Redis Commands](https://redis.io/commands/)
-- [Prisma Quickstart](https://www.prisma.io/docs/getting-started)
-- [shadcn/ui Components](https://ui.shadcn.com/)
-
----
-
-## License
-
-MIT

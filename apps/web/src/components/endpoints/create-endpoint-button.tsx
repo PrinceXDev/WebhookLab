@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 export function CreateEndpointButton() {
   const [open, setOpen] = useState(false);
@@ -22,15 +23,8 @@ export function CreateEndpointButton() {
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string }) => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/endpoints`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error('Failed to create endpoint');
-      return res.json();
-    },
+    mutationFn: (data: { name: string; description: string }) => 
+      apiClient.post('/api/endpoints', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['endpoints'] });
       setOpen(false);

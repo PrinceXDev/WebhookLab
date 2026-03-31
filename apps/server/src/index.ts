@@ -3,10 +3,12 @@ import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
+import morgan from "morgan";
 import { webhookRouter } from "./routes/webhook.js";
 import { apiRouter } from "./routes/api.js";
 import { initializeWebSocket } from "./websocket/index.js";
 import { redisClient, redisPubClient } from "./redis/client.js";
+import { logger, morganStream } from "./utils/logger.js";
 
 dotenv.config();
 
@@ -40,6 +42,14 @@ app.use(
   }),
 );
 
+// Morgan HTTP request logging
+app.use(
+  morgan(
+    ':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" - :response-time ms',
+    { stream: morganStream }
+  )
+);
+
 app.use("/api", express.json());
 app.use("/hook", webhookRouter);
 app.use("/api", apiRouter);
@@ -56,20 +66,20 @@ async function startServer() {
   try {
     await redisClient.connect();
     await redisPubClient.connect();
-    console.log("✅ Redis connected");
+    logger.info("✅ Redis connected");
 
     httpServer.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`🔌 WebSocket server ready`);
+      logger.info(`🚀 Server running on http://localhost:${PORT}`);
+      logger.info(`🔌 WebSocket server ready`);
     });
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
+    logger.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 }
 
 process.on("SIGTERM", async () => {
-  console.log("SIGTERM received, closing server...");
+  logger.info("SIGTERM received, closing server...");
   await redisClient.quit();
   await redisPubClient.quit();
   httpServer.close();

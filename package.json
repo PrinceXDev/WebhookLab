@@ -8,6 +8,7 @@
     "start": "turbo run start",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
+    "generate-secret": "node scripts/generate-secret.js",
     "db:init": "Get-Content scripts/init-db.sql | docker exec -i webhooklab-postgres psql -U webhooklab -d webhooklab && cd apps/server && pnpm prisma generate",
     "db:push": "pwsh scripts/sync-prisma-schema.ps1",
     "db:studio": "cd apps/server && pnpm prisma studio",

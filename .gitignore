@@ -20,6 +20,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Application logs
+apps/server/logs/
+
 # Local env files
 .env
 .env*.local

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useWebSocket } from '@/hooks/use-websocket';
-import { EventCard } from './event-card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useCallback, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { EventCard } from "./event-card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface WebhookEvent {
   id: string;
@@ -22,21 +22,24 @@ interface EventFeedProps {
 
 export function EventFeed({ endpointSlug }: EventFeedProps) {
   const [liveEvents, setLiveEvents] = useState<WebhookEvent[]>([]);
-  
+
   const { data: historicalEvents, isLoading } = useQuery<WebhookEvent[]>({
-    queryKey: ['events', endpointSlug],
+    queryKey: ["events", endpointSlug],
     queryFn: async () => {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/endpoints/${endpointSlug}/events`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/endpoints/${endpointSlug}/events`,
       );
-      if (!res.ok) throw new Error('Failed to fetch events');
+      if (!res.ok) throw new Error("Failed to fetch events");
       return res.json();
     },
   });
 
-  const { isConnected } = useWebSocket(endpointSlug, (event: WebhookEvent) => {
+  // Memoize the event handler to prevent unnecessary re-subscriptions
+  const handleEvent = useCallback((event: WebhookEvent) => {
     setLiveEvents((prev) => [event, ...prev]);
-  });
+  }, []);
+
+  const { isConnected } = useWebSocket(endpointSlug, handleEvent);
 
   const allEvents = [...liveEvents, ...(historicalEvents || [])];
 
@@ -53,17 +56,15 @@ export function EventFeed({ endpointSlug }: EventFeedProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">
-          Events ({allEvents.length})
-        </h2>
+        <h2 className="text-xl font-semibold">Events ({allEvents.length})</h2>
         <div className="flex items-center gap-2">
           <div
             className={`h-2 w-2 rounded-full ${
-              isConnected ? 'bg-green-500' : 'bg-red-500'
+              isConnected ? "bg-green-500" : "bg-red-500"
             }`}
           />
           <span className="text-sm text-muted-foreground">
-            {isConnected ? 'Live' : 'Disconnected'}
+            {isConnected ? "Live" : "Disconnected"}
           </span>
         </div>
       </div>

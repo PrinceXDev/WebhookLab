@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { EndpointCard } from './endpoint-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { apiClient } from '@/lib/api-client';
 
 interface Endpoint {
   id: string;
@@ -16,11 +17,7 @@ interface Endpoint {
 export function EndpointList() {
   const { data: endpoints, isLoading } = useQuery<Endpoint[]>({
     queryKey: ['endpoints'],
-    queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/endpoints`);
-      if (!res.ok) throw new Error('Failed to fetch endpoints');
-      return res.json();
-    },
+    queryFn: () => apiClient.get('/api/endpoints'),
   });
 
   if (isLoading) {

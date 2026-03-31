@@ -17,22 +17,29 @@
   "dependencies": {
     "@prisma/client": "^6.2.0",
     "@webhooklab/shared": "workspace:*",
-    "express": "^4.21.2",
-    "socket.io": "^4.8.1",
-    "redis": "^4.7.0",
     "bullmq": "^5.28.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jose": "^6.2.2",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
     "nanoid": "^5.0.9",
+    "next-auth": "^4.24.13",
+    "redis": "^4.7.0",
+    "socket.io": "^4.8.1",
+    "winston": "^3.19.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
     "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
     "@types/node": "^22.10.5",
+    "eslint": "^9.18.0",
     "prisma": "^6.2.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2",
-    "eslint": "^9.18.0"
+    "typescript": "^5.7.2"
   }
 }
