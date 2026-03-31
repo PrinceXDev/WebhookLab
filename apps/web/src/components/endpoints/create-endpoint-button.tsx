@@ -20,22 +20,28 @@ export function CreateEndpointButton() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [webhookSecret, setWebhookSecret] = useState('');
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; description: string }) => 
+    mutationFn: (data: { name: string; description: string; webhookSecret?: string }) => 
       apiClient.post('/api/endpoints', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['endpoints'] });
       setOpen(false);
       setName('');
       setDescription('');
+      setWebhookSecret('');
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate({ name, description });
+    createMutation.mutate({ 
+      name, 
+      description,
+      webhookSecret: webhookSecret || undefined,
+    });
   };
 
   return (
@@ -72,6 +78,19 @@ export function CreateEndpointButton() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="webhookSecret">Webhook Secret (optional)</Label>
+            <Input
+              id="webhookSecret"
+              type="password"
+              placeholder="whsec_... (for signature verification)"
+              value={webhookSecret}
+              onChange={(e) => setWebhookSecret(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Required for verifying signatures from Stripe, GitHub, or Shopify
+            </p>
           </div>
           <Button type="submit" className="w-full" disabled={createMutation.isPending}>
             {createMutation.isPending ? 'Creating...' : 'Create Endpoint'}

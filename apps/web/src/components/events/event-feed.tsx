@@ -14,6 +14,13 @@ interface WebhookEvent {
   sourceIp: string;
   contentType: string;
   timestamp: number;
+  signatureVerification?: {
+    provider: string;
+    isValid: boolean;
+    status: string;
+    algorithm?: string;
+    message?: string;
+  };
 }
 
 interface EventFeedProps {

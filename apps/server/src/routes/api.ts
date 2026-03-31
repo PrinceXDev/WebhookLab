@@ -28,7 +28,7 @@ apiRouter.get("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
 
 apiRouter.post("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
   try {
-    const { name, description, forwardingUrl } = req.body;
+    const { name, description, forwardingUrl, webhookSecret } = req.body;
     const userId = req.userId!;
 
     const endpoint = {
@@ -37,6 +37,7 @@ apiRouter.post("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
       name,
       description: description || null,
       forwardingUrl: forwardingUrl || null,
+      webhookSecret: webhookSecret || null, // For signature verification
       secretKey: nanoid(32), // ex:- V1StGXR8_Z5jdHi6B-myT3kLm9PqR2x
       userId,
       isActive: true,
@@ -48,7 +49,8 @@ apiRouter.post("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
     logger.info("✅ Endpoint created", { 
       endpointId: endpoint.id, 
       slug: endpoint.slug, 
-      userId 
+      userId,
+      hasWebhookSecret: !!webhookSecret,
     });
 
     res.json(endpoint);
@@ -94,6 +96,53 @@ apiRouter.get("/endpoints/:slug/events/:eventId", async (req, res) => {
       eventId: req.params.eventId 
     });
     res.status(500).json({ error: "Failed to fetch event" });
+  }
+});
+
+apiRouter.patch("/endpoints/:id", authenticateJWT, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId!;
+    const { webhookSecret, forwardingUrl, name, description, isActive } = req.body;
+
+    // Get existing endpoint
+    const endpoints = await getEndpoints(userId);
+    const endpoint = endpoints.find(e => e.id === id);
+
+    if (!endpoint) {
+      return res.status(404).json({ error: "Endpoint not found" });
+    }
+
+    if (endpoint.userId !== userId) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    // Update endpoint
+    const updatedEndpoint = {
+      ...endpoint,
+      webhookSecret: webhookSecret !== undefined ? webhookSecret : endpoint.webhookSecret,
+      forwardingUrl: forwardingUrl !== undefined ? forwardingUrl : endpoint.forwardingUrl,
+      name: name !== undefined ? name : endpoint.name,
+      description: description !== undefined ? description : endpoint.description,
+      isActive: isActive !== undefined ? isActive : endpoint.isActive,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await storeEndpoint(updatedEndpoint);
+    logger.info("✏️ Endpoint updated", { 
+      endpointId: id, 
+      userId,
+      updatedFields: Object.keys(req.body),
+    });
+
+    res.json(updatedEndpoint);
+  } catch (error) {
+    logger.error("Error updating endpoint", { 
+      error, 
+      endpointId: req.params.id, 
+      userId: req.userId 
+    });
+    res.status(500).json({ error: "Failed to update endpoint" });
   }
 });
 

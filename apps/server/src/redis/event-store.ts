@@ -13,6 +13,13 @@ export interface StoredWebhookEvent {
   sourceIp: string;
   contentType: string;
   timestamp: number;
+  signatureVerification?: {
+    provider: string;
+    isValid: boolean;
+    status: string;
+    algorithm?: string;
+    message?: string;
+  };
 }
 
 export async function storeWebhookEvent(

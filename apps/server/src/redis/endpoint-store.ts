@@ -7,6 +7,7 @@ export interface StoredEndpoint {
   description: string | null;
   forwardingUrl: string | null;
   secretKey: string;
+  webhookSecret?: string | null; // For signature verification (Stripe/GitHub/Shopify secret)
   userId: string;
   isActive: boolean;
   createdAt: string;
