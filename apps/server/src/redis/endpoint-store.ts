@@ -71,24 +71,32 @@ export async function getEndpointBySlug(slug: string): Promise<StoredEndpoint | 
   return data ? JSON.parse(data) : null;
 }
 
-export async function deleteEndpoint(id: string, userId?: string): Promise<void> {
+/** @returns false if no endpoint existed for id */
+export async function deleteEndpoint(
+  id: string,
+  userId?: string,
+): Promise<boolean> {
   const key = `endpoint:${id}`;
-  const endpoint = await redisClient.get(key);
-  
-  if (endpoint) {
-    const parsed = JSON.parse(endpoint);
-    
-    if (userId && parsed.userId !== userId) {
-      throw new Error('Unauthorized: Cannot delete endpoint owned by another user');
-    }
-    
-    const slugKey = `endpoint:slug:${parsed.slug}`;
-    const userEndpointsKey = `user:${parsed.userId}:endpoints`;
-    
-    await redisClient.del(slugKey);
-    await redisClient.sRem(userEndpointsKey, id);
+  const raw = await redisClient.get(key);
+
+  if (!raw) {
+    return false;
   }
-  
+
+  const parsed = JSON.parse(raw) as StoredEndpoint;
+
+  if (userId && parsed.userId !== userId) {
+    throw new Error(
+      'Unauthorized: Cannot delete endpoint owned by another user',
+    );
+  }
+
+  const slugKey = `endpoint:slug:${parsed.slug}`;
+  const userEndpointsKey = `user:${parsed.userId}:endpoints`;
+
+  await redisClient.del(slugKey);
+  await redisClient.sRem(userEndpointsKey, id);
   await redisClient.del(key);
   await redisClient.sRem('endpoints:all', id);
+  return true;
 }

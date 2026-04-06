@@ -1,26 +1,18 @@
-'use client';
+"use client";
 
-import { EndpointCard } from './endpoint-card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/api-client';
-import { useQuery } from '@tanstack/react-query';
-
-interface Endpoint {
-  id: string;
-  slug: string;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-  createdAt: string;
-}
+import { EndpointCard } from "./endpoint-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/use-toast";
+import { apiClient } from "@/lib/api-client";
+import { useQuery } from "@tanstack/react-query";
+import type { EndpointRecord } from "@/types/endpoint";
 
 export function EndpointList() {
-  const { data: endpoints, isLoading, isError } = useQuery<Endpoint[]>({
+  const { data: endpoints, isLoading, isError } = useQuery<EndpointRecord[]>({
     queryKey: ['endpoints'],
     queryFn: async () => {
       try {
-        return await apiClient.get<Endpoint[]>('/api/endpoints');
+        return await apiClient.get<EndpointRecord[]>("/api/endpoints");
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Failed to load endpoints';

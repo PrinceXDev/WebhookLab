@@ -54,6 +54,16 @@ export const apiClient = {
     return response.json() as Promise<T>;
   },
 
+  patch: async <T = unknown>(path: string, data: unknown): Promise<T> => {
+    const response = await fetchWithAuth(url(path), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    await ensureOk(response, `Failed to update ${path}`);
+    return response.json() as Promise<T>;
+  },
+
   delete: async <T = unknown>(path: string): Promise<T> => {
     const response = await fetchWithAuth(url(path), {
       method: "DELETE",

@@ -27,11 +27,29 @@ export const updateEndpointSchema = z.object({
     .max(100, 'Name must be at most 100 characters')
     .optional(),
   description: z
-    .string()
-    .trim()
-    .max(500, 'Description must be at most 500 characters')
+    .union([
+      z
+        .string()
+        .trim()
+        .max(500, 'Description must be at most 500 characters'),
+      z.null(),
+    ])
     .optional(),
-  forwardingUrl: z.string().url('Enter a valid URL').optional(),
+  forwardingUrl: z
+    .union([
+      z.string().url('Enter a valid URL'),
+      z.null(),
+    ])
+    .optional(),
+  webhookSecret: z
+    .union([
+      z
+        .string()
+        .trim()
+        .max(2048, 'Webhook secret must be at most 2048 characters'),
+      z.null(),
+    ])
+    .optional(),
   isActive: z.boolean().optional(),
 });
 

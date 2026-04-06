@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { nanoid } from "nanoid";
 import { ZodError } from "zod";
+import { updateEndpointSchema } from "@webhooklab/shared";
 import {
   getRecentEvents,
   getEventById,
@@ -19,6 +20,13 @@ import {
   analyzeWebhookPayload,
   isOpenAiConfigured,
 } from "../services/payload-analyzer.js";
+
+function valueIfPatched<T>(patched: T | undefined, current: T): T {
+  if (patched === undefined) {
+    return current;
+  }
+  return patched;
+}
 
 export const apiRouter = Router();
 
@@ -202,9 +210,18 @@ apiRouter.patch(
     const { params, body, userId } = req;
     const { id: idParam } = params;
     const id = String(idParam);
-    const { webhookSecret, forwardingUrl, name, description, isActive } = body;
 
     try {
+      const parsedBody = updateEndpointSchema.safeParse(body);
+      if (!parsedBody.success) {
+        const flat = parsedBody.error.flatten().fieldErrors;
+        return res.status(400).json({
+          error: "Invalid request",
+          details: flat,
+        });
+      }
+
+      const patch = parsedBody.data;
       const endpoints = await getEndpoints(userId!);
       const endpoint = endpoints.find((e) => e.id === id);
 
@@ -218,14 +235,17 @@ apiRouter.patch(
 
       const updatedEndpoint = {
         ...endpoint,
-        webhookSecret:
-          webhookSecret === undefined ? endpoint.webhookSecret : webhookSecret,
-        forwardingUrl:
-          forwardingUrl === undefined ? endpoint.forwardingUrl : forwardingUrl,
-        name: name === undefined ? endpoint.name : name,
-        description:
-          description === undefined ? endpoint.description : description,
-        isActive: isActive === undefined ? endpoint.isActive : isActive,
+        name: valueIfPatched(patch.name, endpoint.name),
+        description: valueIfPatched(patch.description, endpoint.description),
+        forwardingUrl: valueIfPatched(
+          patch.forwardingUrl,
+          endpoint.forwardingUrl,
+        ),
+        webhookSecret: valueIfPatched(
+          patch.webhookSecret,
+          endpoint.webhookSecret,
+        ),
+        isActive: valueIfPatched(patch.isActive, endpoint.isActive),
         updatedAt: new Date().toISOString(),
       };
 
@@ -233,7 +253,7 @@ apiRouter.patch(
       logger.info("✏️ Endpoint updated", {
         endpointId: id,
         userId,
-        updatedFields: Object.keys(body),
+        updatedFields: Object.keys(patch),
       });
 
       return res.json(updatedEndpoint);
@@ -257,11 +277,18 @@ apiRouter.delete(
     const id = String(idParam);
 
     try {
-      await deleteEndpoint(id, userId!);
+      const deleted = await deleteEndpoint(id, userId!);
+      if (!deleted) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
       logger.info("🗑️ Endpoint deleted", { endpointId: id, userId });
 
       return res.json({ success: true });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("Unauthorized")) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       logger.error("Error deleting endpoint", {
         error,
         endpointId: id,
