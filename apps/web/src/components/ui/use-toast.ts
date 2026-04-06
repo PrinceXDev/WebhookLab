@@ -1,7 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import type { ReactNode } from "react";
+import { ReactNode, useSyncExternalStore } from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1;
@@ -48,19 +47,6 @@ interface State {
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 const genId = (): string => crypto.randomUUID();
-
-let dispatch: (action: Action) => void;
-
-const addToRemoveQueue = (toastId: string): void => {
-  if (toastTimeouts.has(toastId)) return;
-
-  const timeout = setTimeout(() => {
-    toastTimeouts.delete(toastId);
-    dispatch({ type: "REMOVE_TOAST", toastId });
-  }, TOAST_REMOVE_DELAY_MS);
-
-  toastTimeouts.set(toastId, timeout);
-};
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
@@ -111,9 +97,22 @@ const listeners = new Set<() => void>();
 
 let memoryState: State = { toasts: [] };
 
-dispatch = (action: Action) => {
+const dispatch = (action: Action): void => {
   memoryState = reducer(memoryState, action);
   listeners.forEach((listener) => listener());
+};
+
+const addToRemoveQueue = (toastId: string): void => {
+  if (toastTimeouts.has(toastId)) {
+    return;
+  }
+
+  const timeout = setTimeout(() => {
+    toastTimeouts.delete(toastId);
+    dispatch({ type: "REMOVE_TOAST", toastId });
+  }, TOAST_REMOVE_DELAY_MS);
+
+  toastTimeouts.set(toastId, timeout);
 };
 
 type ToastInput = Omit<ToasterToast, "id">;
@@ -140,7 +139,9 @@ const toast = ({
       open: true,
       duration: Number.POSITIVE_INFINITY,
       onOpenChange: (open: boolean) => {
-        if (!open) dismiss();
+        if (!open) {
+          dismiss();
+        }
       },
     },
   });

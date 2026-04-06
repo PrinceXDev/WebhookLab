@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { signIn } from 'next-auth/react';
-import { ReactNode } from 'react';
+import { signIn } from "next-auth/react";
+import { ReactNode } from "react";
 
 interface SignInButtonProps {
   children: ReactNode;
@@ -9,7 +9,7 @@ interface SignInButtonProps {
 
 export function SignInButton({ children }: SignInButtonProps) {
   return (
-    <div onClick={() => signIn('github', { callbackUrl: '/dashboard' })}>
+    <div onClick={() => signIn("github", { callbackUrl: "/dashboard" })}>
       {children}
     </div>
   );

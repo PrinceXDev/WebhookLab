@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { nanoid } from "nanoid";
-import { storeWebhookEvent } from "../redis/event-store.js";
 import { publishWebhookEvent } from "../redis/pubsub.js";
 import { getEndpointBySlug } from "../redis/endpoint-store.js";
 import { logger } from "../utils/logger.js";
 import { verifyWebhookSignature } from "../services/signature-verifier.js";
-import type { StoredWebhookEvent } from "../redis/event-store.js";
+import {
+  storeWebhookEvent,
+  type StoredWebhookEvent,
+} from "../redis/event-store.js";
 
 export const webhookRouter = Router();
 

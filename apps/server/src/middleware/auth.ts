@@ -57,9 +57,9 @@ export async function authenticateJWT(
       throw new Error("Invalid token");
     }
 
-    req.userId = (decoded.id as string) || (decoded.sub as string);
+    req.userId = (decoded.id as string) ?? (decoded.sub as string);
     req.user = {
-      id: (decoded.id as string) || (decoded.sub as string),
+      id: (decoded.id as string) ?? (decoded.sub as string),
       email: decoded.email as string,
       name: decoded.name as string,
       githubId: decoded.githubId as string,
@@ -69,9 +69,9 @@ export async function authenticateJWT(
 
     return next();
   } catch (error) {
-    logger.warn("JWT verification failed", { 
+    logger.warn("JWT verification failed", {
       error: error instanceof Error ? error.message : error,
-      path: req.path 
+      path: req.path,
     });
     return res.status(403).json({ error: "Invalid or expired token" });
   }
@@ -116,17 +116,17 @@ export async function optionalAuth(
     });
 
     if (decoded) {
-      req.userId = (decoded.id as string) || (decoded.sub as string);
+      req.userId = (decoded.id as string) ?? (decoded.sub as string);
       req.user = {
-        id: (decoded.id as string) || (decoded.sub as string),
+        id: (decoded.id as string) ?? (decoded.sub as string),
         email: decoded.email as string,
         name: decoded.name as string,
         githubId: decoded.githubId as string,
       };
     }
   } catch (error) {
-    logger.debug("Optional JWT verification failed", { 
-      error: error instanceof Error ? error.message : error 
+    logger.debug("Optional JWT verification failed", {
+      error: error instanceof Error ? error.message : error,
     });
   }
 

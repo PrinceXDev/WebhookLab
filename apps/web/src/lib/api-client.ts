@@ -24,7 +24,7 @@ async function readErrorMessage(
       typeof (body as { error: unknown }).error === "string"
     ) {
       const msg = (body as { error: string }).error;
-      if (msg.length > 0) return msg;
+      if (msg.length > 0) {return msg;}
     }
   } catch {
     /* empty or non-JSON body */
@@ -33,7 +33,7 @@ async function readErrorMessage(
 }
 
 async function ensureOk(response: Response, fallback: string): Promise<void> {
-  if (response.ok) return;
+  if (response.ok) {return;}
   throw new Error(await readErrorMessage(response, fallback));
 }
 

@@ -61,7 +61,8 @@ const initialFormState: FormState = {
 const buildUpdatePayload = (form: FormState): UpdateEndpointInput => {
   const payload: UpdateEndpointInput = {
     name: form.name,
-    description: form.description.trim() === "" ? null : form.description.trim(),
+    description:
+      form.description.trim() === "" ? null : form.description.trim(),
     forwardingUrl:
       form.forwardingUrl.trim() === "" ? null : form.forwardingUrl.trim(),
     isActive: form.isActive,
@@ -168,7 +169,9 @@ export const EndpointFormDialog = ({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
 
     if (isEdit && endpoint) {
       setForm({
@@ -229,7 +232,9 @@ export const EndpointFormDialog = ({
 
   const clearFieldError = (key: FieldKey) => {
     setFieldErrors((prev) => {
-      if (!prev[key]) return prev;
+      if (!prev[key]) {
+        return prev;
+      }
       const next = { ...prev };
       delete next[key];
       return next;
@@ -363,7 +368,7 @@ export const EndpointFormDialog = ({
                   type="checkbox"
                   checked={form.removeWebhookSecret}
                   onChange={(e) => {
-                    const checked = e.target.checked;
+                    const { checked } = e.target;
                     setForm((prev) => ({
                       ...prev,
                       removeWebhookSecret: checked,

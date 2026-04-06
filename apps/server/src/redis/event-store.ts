@@ -1,5 +1,5 @@
-import type { AiPayloadAnalysis } from '@webhooklab/shared';
-import { redisClient } from './client.js';
+import type { AiPayloadAnalysis } from "@webhooklab/shared";
+import { redisClient } from "./client.js";
 
 const MAX_EVENTS_PER_ENDPOINT = 500;
 const EVENT_TTL_SECONDS = 72 * 60 * 60; // 72 hours
@@ -26,11 +26,11 @@ export interface StoredWebhookEvent {
 
 export async function storeWebhookEvent(
   endpointSlug: string,
-  event: StoredWebhookEvent
+  event: StoredWebhookEvent,
 ): Promise<void> {
   const key = `webhook:${endpointSlug}:events`;
   const timestamp = Date.now();
-  
+
   await redisClient.zAdd(key, {
     score: timestamp,
     value: JSON.stringify(event),
@@ -43,27 +43,27 @@ export async function storeWebhookEvent(
 
 export async function getRecentEvents(
   endpointSlug: string,
-  limit: number = 50
+  limit: number = 50,
 ): Promise<StoredWebhookEvent[]> {
   const key = `webhook:${endpointSlug}:events`;
-  
+
   const events = await redisClient.zRange(key, -limit, -1, { REV: true });
-  
+
   return events.map((event) => JSON.parse(event));
 }
 
 export async function getEventById(
   endpointSlug: string,
-  eventId: string
+  eventId: string,
 ): Promise<StoredWebhookEvent | null> {
   const key = `webhook:${endpointSlug}:events`;
   const events = await redisClient.zRange(key, 0, -1);
-  
+
   const event = events.find((e) => {
     const parsed = JSON.parse(e);
     return parsed.id === eventId;
   });
-  
+
   return event ? JSON.parse(event) : null;
 }
 

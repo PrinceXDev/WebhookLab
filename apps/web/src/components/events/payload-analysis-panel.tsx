@@ -20,8 +20,12 @@ const STEPS = [
 function confidenceVariant(
   c: AiPayloadAnalysis["providerConfidence"],
 ): "default" | "secondary" | "outline" {
-  if (c === "high") return "default";
-  if (c === "medium") return "secondary";
+  if (c === "high") {
+    return "default";
+  }
+  if (c === "medium") {
+    return "secondary";
+  }
   return "outline";
 }
 
@@ -66,7 +70,9 @@ export function PayloadAnalysisPanel({
   const pending = mutation.isPending;
 
   const copyCode = async () => {
-    if (!active?.suggestedHandler.code) return;
+    if (!active?.suggestedHandler.code) {
+      return;
+    }
     await navigator.clipboard.writeText(active.suggestedHandler.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -113,7 +119,10 @@ export function PayloadAnalysisPanel({
         </div>
       </div>
 
-      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Analysis flow">
+      <ol
+        className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+        aria-label="Analysis flow"
+      >
         {STEPS.map((step, i) => {
           const done = Boolean(active) && !pending;
           return (
@@ -143,14 +152,17 @@ export function PayloadAnalysisPanel({
       {pending && (
         <p className="text-xs text-muted-foreground flex items-center gap-2">
           <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-          Sending payload to the model (headers + body). This may take a few seconds.
+          Sending payload to the model (headers + body). This may take a few
+          seconds.
         </p>
       )}
 
       {active && (
         <div className="space-y-4 pt-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">Detected provider</span>
+            <span className="text-xs text-muted-foreground">
+              Detected provider
+            </span>
             <Badge variant="secondary">{active.providerGuess}</Badge>
             <Badge variant={confidenceVariant(active.providerConfidence)}>
               {active.providerConfidence} confidence
@@ -171,7 +183,9 @@ export function PayloadAnalysisPanel({
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
               Plain English
             </p>
-            <p className="text-sm leading-relaxed">{active.plainEnglishSummary}</p>
+            <p className="text-sm leading-relaxed">
+              {active.plainEnglishSummary}
+            </p>
           </div>
 
           {active.keyFields && active.keyFields.length > 0 && (
@@ -181,8 +195,13 @@ export function PayloadAnalysisPanel({
               </p>
               <dl className="grid gap-1 text-xs sm:grid-cols-2">
                 {active.keyFields.map((f) => (
-                  <div key={f.name} className="flex gap-2 rounded bg-muted/50 px-2 py-1">
-                    <dt className="font-mono text-muted-foreground shrink-0">{f.name}</dt>
+                  <div
+                    key={f.name}
+                    className="flex gap-2 rounded bg-muted/50 px-2 py-1"
+                  >
+                    <dt className="font-mono text-muted-foreground shrink-0">
+                      {f.name}
+                    </dt>
                     <dd className="truncate font-mono">{f.value}</dd>
                   </div>
                 ))}
@@ -221,7 +240,8 @@ export function PayloadAnalysisPanel({
           </div>
 
           <p className="text-[10px] text-muted-foreground">
-            Model: {active.model} · {new Date(active.analyzedAt).toLocaleString()}
+            Model: {active.model} ·{" "}
+            {new Date(active.analyzedAt).toLocaleString()}
           </p>
         </div>
       )}

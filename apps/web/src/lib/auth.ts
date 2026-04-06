@@ -1,6 +1,5 @@
-import type { Account } from "next-auth";
+import type { Account, NextAuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
-import { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
 
 /** GitHub user object returned by OAuth (subset used for JWT seeding). */
@@ -12,9 +11,7 @@ type GithubOAuthProfile = {
   avatar_url?: string;
 };
 
-const parseGithubProfile = (
-  profile: unknown,
-): GithubOAuthProfile | null => {
+const parseGithubProfile = (profile: unknown): GithubOAuthProfile | null => {
   if (!profile || typeof profile !== "object" || !("id" in profile)) {
     return null;
   }
@@ -31,7 +28,9 @@ const seedTokenFromGithubAccount = (
   profile: unknown,
 ): void => {
   const gh = parseGithubProfile(profile);
-  if (!gh) return;
+  if (!gh) {
+    return;
+  }
 
   const { id, email, name, login, avatar_url } = gh;
   const { access_token } = account;
@@ -75,14 +74,7 @@ export const authOptions: NextAuthOptions = {
     session: async ({ session, token }) => {
       const { user } = session;
       if (user) {
-        const {
-          id,
-          githubId,
-          accessToken,
-          email,
-          name,
-          picture,
-        } = token;
+        const { id, githubId, accessToken, email, name, picture } = token;
 
         Object.assign(user, {
           id,

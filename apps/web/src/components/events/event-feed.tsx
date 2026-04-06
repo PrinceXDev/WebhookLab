@@ -69,7 +69,9 @@ export function EventFeed({ endpointSlug }: EventFeedProps) {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/endpoints/${endpointSlug}/events`,
       );
-      if (!res.ok) throw new Error("Failed to fetch events");
+      if (!res.ok) {
+        throw new Error("Failed to fetch events");
+      }
       return res.json();
     },
   });

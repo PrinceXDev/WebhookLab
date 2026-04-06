@@ -28,7 +28,9 @@ function pickRelevantHeaders(
   const picked: Record<string, string> = {};
   for (const h of HEADER_HINTS) {
     const key = Object.keys(headers).find((k) => k.toLowerCase() === h);
-    if (key) picked[h] = headers[key]!;
+    if (key) {
+      picked[h] = headers[key]!;
+    }
   }
   return picked;
 }
