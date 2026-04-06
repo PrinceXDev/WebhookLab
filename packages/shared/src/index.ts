@@ -1,3 +1,3 @@
-export * from "./schemas/endpoint.js";
-export * from "./schemas/webhook-event.js";
-export * from "./types/index.js";
+export * from "./schemas/endpoint";
+export * from "./schemas/webhook-event";
+export * from "./types/index";

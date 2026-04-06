@@ -1,32 +1,64 @@
 export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   return fetch(url, {
     ...options,
-    credentials: 'include',
+    credentials: "include",
   });
 }
 
+const baseUrl = () => process.env.NEXT_PUBLIC_API_URL ?? "";
+
+function url(path: string) {
+  return `${baseUrl()}${path}`;
+}
+
+async function readErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    if (
+      body !== null &&
+      typeof body === "object" &&
+      "error" in body &&
+      typeof (body as { error: unknown }).error === "string"
+    ) {
+      const msg = (body as { error: string }).error;
+      if (msg.length > 0) return msg;
+    }
+  } catch {
+    /* empty or non-JSON body */
+  }
+  return fallback;
+}
+
+async function ensureOk(response: Response, fallback: string): Promise<void> {
+  if (response.ok) return;
+  throw new Error(await readErrorMessage(response, fallback));
+}
+
 export const apiClient = {
-  get: async (path: string) => {
-    const response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}${path}`);
-    if (!response.ok) throw new Error(`Failed to fetch ${path}`);
-    return response.json();
+  get: async <T = unknown>(path: string): Promise<T> => {
+    const response = await fetchWithAuth(url(path));
+    await ensureOk(response, `Failed to fetch ${path}`);
+    return response.json() as Promise<T>;
   },
 
-  post: async (path: string, data: any) => {
-    const response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+  post: async <T = unknown>(path: string, data: unknown): Promise<T> => {
+    const response = await fetchWithAuth(url(path), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error(`Failed to post to ${path}`);
-    return response.json();
+    await ensureOk(response, `Failed to post to ${path}`);
+    return response.json() as Promise<T>;
   },
 
-  delete: async (path: string) => {
-    const response = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
-      method: 'DELETE',
+  delete: async <T = unknown>(path: string): Promise<T> => {
+    const response = await fetchWithAuth(url(path), {
+      method: "DELETE",
     });
-    if (!response.ok) throw new Error(`Failed to delete ${path}`);
-    return response.json();
+    await ensureOk(response, `Failed to delete ${path}`);
+    return response.json() as Promise<T>;
   },
 };

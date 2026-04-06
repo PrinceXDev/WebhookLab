@@ -1,15 +1,37 @@
 import { z } from 'zod';
 
 export const createEndpointSchema = z.object({
-  name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
-  forwardingUrl: z.string().url().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Name is required')
+    .max(100, 'Name must be at most 100 characters'),
+  description: z
+    .string()
+    .trim()
+    .max(500, 'Description must be at most 500 characters')
+    .optional(),
+  forwardingUrl: z.string().url('Enter a valid URL').optional(),
+  webhookSecret: z
+    .string()
+    .trim()
+    .max(2048, 'Webhook secret must be at most 2048 characters')
+    .optional(),
 });
 
 export const updateEndpointSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  description: z.string().max(500).optional(),
-  forwardingUrl: z.string().url().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Name is required')
+    .max(100, 'Name must be at most 100 characters')
+    .optional(),
+  description: z
+    .string()
+    .trim()
+    .max(500, 'Description must be at most 500 characters')
+    .optional(),
+  forwardingUrl: z.string().url('Enter a valid URL').optional(),
   isActive: z.boolean().optional(),
 });
 

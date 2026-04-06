@@ -1,9 +1,10 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { EndpointCard } from './endpoint-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api-client';
+import { useQuery } from '@tanstack/react-query';
 
 interface Endpoint {
   id: string;
@@ -15,9 +16,22 @@ interface Endpoint {
 }
 
 export function EndpointList() {
-  const { data: endpoints, isLoading } = useQuery<Endpoint[]>({
+  const { data: endpoints, isLoading, isError } = useQuery<Endpoint[]>({
     queryKey: ['endpoints'],
-    queryFn: () => apiClient.get('/api/endpoints'),
+    queryFn: async () => {
+      try {
+        return await apiClient.get<Endpoint[]>('/api/endpoints');
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Failed to load endpoints';
+        toast({
+          variant: 'destructive',
+          title: 'Failed to load endpoints',
+          description: message,
+        });
+        throw err;
+      }
+    },
   });
 
   if (isLoading) {
@@ -26,6 +40,14 @@ export function EndpointList() {
         {[...Array(3)].map((_, i) => (
           <Skeleton key={i} className="h-48" />
         ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="py-12 text-center text-sm text-destructive">
+        Could not load endpoints. Check the notification or refresh the page.
       </div>
     );
   }
