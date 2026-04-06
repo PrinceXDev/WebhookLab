@@ -1,3 +1,4 @@
+import type { AiPayloadAnalysis } from '@webhooklab/shared';
 import { redisClient } from './client.js';
 
 const MAX_EVENTS_PER_ENDPOINT = 500;
@@ -20,6 +21,7 @@ export interface StoredWebhookEvent {
     algorithm?: string;
     message?: string;
   };
+  aiAnalysis?: AiPayloadAnalysis;
 }
 
 export async function storeWebhookEvent(
@@ -68,4 +70,28 @@ export async function getEventById(
 export async function getEventCount(endpointSlug: string): Promise<number> {
   const key = `webhook:${endpointSlug}:events`;
   return await redisClient.zCard(key);
+}
+
+/** Replace a stored event member (same id + timestamp) after e.g. attaching AI analysis. */
+export async function replaceWebhookEvent(
+  endpointSlug: string,
+  eventId: string,
+  updated: StoredWebhookEvent,
+): Promise<boolean> {
+  const key = `webhook:${endpointSlug}:events`;
+  const members = await redisClient.zRange(key, 0, -1);
+
+  for (const member of members) {
+    const parsed = JSON.parse(member) as StoredWebhookEvent;
+    if (parsed.id === eventId) {
+      await redisClient.zRem(key, member);
+      await redisClient.zAdd(key, {
+        score: parsed.timestamp,
+        value: JSON.stringify(updated),
+      });
+      return true;
+    }
+  }
+
+  return false;
 }

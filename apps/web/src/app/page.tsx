@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -9,7 +10,10 @@ export default async function HomePage() {
   const session = await getServerSession(authOptions);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+    <div className="relative min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+      <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6">
+        <ThemeToggle />
+      </div>
       <div className="max-w-4xl mx-auto px-6 text-center space-y-8">
         <div className="space-y-4">
           <h1 className="text-6xl font-bold tracking-tight">

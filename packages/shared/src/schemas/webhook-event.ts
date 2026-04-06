@@ -12,4 +12,5 @@ export const webhookEventSchema = z.object({
   timestamp: z.number(),
 });
 
-export type WebhookEvent = z.infer<typeof webhookEventSchema>;
+/** Inferred shape from `webhookEventSchema` (distinct from `WebhookEvent` in `./types`). */
+export type ParsedWebhookEvent = z.infer<typeof webhookEventSchema>;

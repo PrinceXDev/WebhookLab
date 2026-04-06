@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { LogOut, Settings, User } from "lucide-react";
 import Image from "next/image";
 
@@ -26,10 +27,12 @@ export function DashboardNav() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link href="/dashboard">
             <Button variant="ghost">Endpoints</Button>
           </Link>
+
+          <ThemeToggle />
 
           {session?.user && (
             <DropdownMenu>

@@ -67,7 +67,7 @@ export async function authenticateJWT(
 
     logger.debug("✅ Authenticated user", { userId: req.userId });
 
-    next();
+    return next();
   } catch (error) {
     logger.warn("JWT verification failed", { 
       error: error instanceof Error ? error.message : error,
@@ -79,7 +79,7 @@ export async function authenticateJWT(
 
 export async function optionalAuth(
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ) {
   const authHeader = req.headers.authorization;
@@ -130,5 +130,5 @@ export async function optionalAuth(
     });
   }
 
-  next();
+  return next();
 }

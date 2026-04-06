@@ -1,16 +1,37 @@
 "use client";
 
-import * as React from "react";
-
+import { useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY_MS = 400;
+/** Radix pauses its timer on pointer move; we dismiss with our own timer instead. */
+const DEFAULT_AUTO_DISMISS_MS = 5_000;
+
+type AutoDismissHandle = ReturnType<typeof globalThis.setTimeout>;
+
+const autoDismissTimers = new Map<string, AutoDismissHandle>();
+
+const clearAutoDismiss = (toastId: string) => {
+  const existing = autoDismissTimers.get(toastId);
+  if (existing !== undefined) {
+    clearTimeout(existing);
+    autoDismissTimers.delete(toastId);
+  }
+};
+
+const clearAllAutoDismiss = () => {
+  for (const t of autoDismissTimers.values()) {
+    clearTimeout(t);
+  }
+  autoDismissTimers.clear();
+};
 
 type ToasterToast = ToastProps & {
   id: string;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
   action?: ToastActionElement;
 };
 
@@ -26,11 +47,11 @@ interface State {
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
-function genId(): string {
-  return crypto.randomUUID();
-}
+const genId = (): string => crypto.randomUUID();
 
-function addToRemoveQueue(toastId: string) {
+let dispatch: (action: Action) => void;
+
+const addToRemoveQueue = (toastId: string): void => {
   if (toastTimeouts.has(toastId)) return;
 
   const timeout = setTimeout(() => {
@@ -39,9 +60,9 @@ function addToRemoveQueue(toastId: string) {
   }, TOAST_REMOVE_DELAY_MS);
 
   toastTimeouts.set(toastId, timeout);
-}
+};
 
-function reducer(state: State, action: Action): State {
+const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
       return {
@@ -58,9 +79,13 @@ function reducer(state: State, action: Action): State {
     case "DISMISS_TOAST": {
       const { toastId } = action;
       if (toastId) {
+        clearAutoDismiss(toastId);
         addToRemoveQueue(toastId);
       } else {
-        state.toasts.forEach((t) => addToRemoveQueue(t.id));
+        state.toasts.forEach((t) => {
+          clearAutoDismiss(t.id);
+          addToRemoveQueue(t.id);
+        });
       }
       return {
         ...state,
@@ -71,33 +96,41 @@ function reducer(state: State, action: Action): State {
     }
     case "REMOVE_TOAST":
       if (action.toastId === undefined) {
+        clearAllAutoDismiss();
         return { ...state, toasts: [] };
       }
+      clearAutoDismiss(action.toastId);
       return {
         ...state,
         toasts: state.toasts.filter((t) => t.id !== action.toastId),
       };
   }
-}
+};
 
-const listeners = new Set<(state: State) => void>();
+const listeners = new Set<() => void>();
 
 let memoryState: State = { toasts: [] };
 
-function dispatch(action: Action) {
+dispatch = (action: Action) => {
   memoryState = reducer(memoryState, action);
-  listeners.forEach((listener) => listener(memoryState));
-}
+  listeners.forEach((listener) => listener());
+};
 
 type ToastInput = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: ToastInput) {
+const toast = ({
+  duration: autoDismissAfterMs = DEFAULT_AUTO_DISMISS_MS,
+  ...props
+}: ToastInput) => {
   const id = genId();
 
   const update = (next: ToasterToast) =>
     dispatch({ type: "UPDATE_TOAST", toast: { ...next, id } });
 
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
+  const dismiss = () => {
+    clearAutoDismiss(id);
+    dispatch({ type: "DISMISS_TOAST", toastId: id });
+  };
 
   dispatch({
     type: "ADD_TOAST",
@@ -105,31 +138,49 @@ function toast({ ...props }: ToastInput) {
       ...props,
       id,
       open: true,
-      onOpenChange: (open) => {
+      duration: Number.POSITIVE_INFINITY,
+      onOpenChange: (open: boolean) => {
         if (!open) dismiss();
       },
     },
   });
 
+  if (autoDismissAfterMs > 0 && Number.isFinite(autoDismissAfterMs)) {
+    const tid = globalThis.setTimeout(() => {
+      autoDismissTimers.delete(id);
+      dispatch({ type: "DISMISS_TOAST", toastId: id });
+    }, autoDismissAfterMs);
+    autoDismissTimers.set(id, tid);
+  }
+
   return { id, dismiss, update };
-}
+};
 
-function useToast() {
-  const [state, setState] = React.useState<State>(memoryState);
-
-  React.useEffect(() => {
-    const listener = (next: State) => setState(next);
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  }, []);
+const useToast = () => {
+  const state = useSyncExternalStore(
+    (onStoreChange) => {
+      const listener = () => onStoreChange();
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    () => memoryState,
+    () => ({ toasts: [] }),
+  );
 
   return {
     ...state,
     toast,
-    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    dismiss: (toastId?: string) => {
+      if (toastId === undefined) {
+        memoryState.toasts.forEach((t) => clearAutoDismiss(t.id));
+      } else {
+        clearAutoDismiss(toastId);
+      }
+      dispatch({ type: "DISMISS_TOAST", toastId });
+    },
   };
-}
+};
 
 export { useToast, toast };

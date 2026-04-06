@@ -1,5 +1,6 @@
 "use client";
 
+import type { AiPayloadAnalysis } from "@webhooklab/shared";
 import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -21,10 +22,42 @@ interface WebhookEvent {
     algorithm?: string;
     message?: string;
   };
+  aiAnalysis?: AiPayloadAnalysis;
 }
 
 interface EventFeedProps {
   endpointSlug: string;
+}
+
+const EVENT_FEED_SKELETON_KEYS = [
+  "event-feed-skeleton-1",
+  "event-feed-skeleton-2",
+  "event-feed-skeleton-3",
+] as const;
+
+/** One row per event id: historical first, then live overlays; keep aiAnalysis if present on either. */
+function mergeEventsDeduped(
+  live: WebhookEvent[],
+  historical: WebhookEvent[] | undefined,
+): WebhookEvent[] {
+  const byId = new Map<string, WebhookEvent>();
+  for (const e of historical ?? []) {
+    byId.set(e.id, e);
+  }
+  for (const e of live) {
+    const existing = byId.get(e.id);
+    byId.set(
+      e.id,
+      existing
+        ? {
+            ...existing,
+            ...e,
+            aiAnalysis: e.aiAnalysis ?? existing.aiAnalysis,
+          }
+        : e,
+    );
+  }
+  return [...byId.values()].sort((a, b) => b.timestamp - a.timestamp);
 }
 
 export function EventFeed({ endpointSlug }: EventFeedProps) {
@@ -41,20 +74,24 @@ export function EventFeed({ endpointSlug }: EventFeedProps) {
     },
   });
 
-  // Memoize the event handler to prevent unnecessary re-subscriptions
   const handleEvent = useCallback((event: WebhookEvent) => {
-    setLiveEvents((prev) => [event, ...prev]);
+    setLiveEvents((prev) => {
+      if (prev.some((e) => e.id === event.id)) {
+        return prev;
+      }
+      return [event, ...prev];
+    });
   }, []);
 
   const { isConnected } = useWebSocket(endpointSlug, handleEvent);
 
-  const allEvents = [...liveEvents, ...(historicalEvents || [])];
+  const allEvents = mergeEventsDeduped(liveEvents, historicalEvents);
 
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <Skeleton key={i} className="h-32" />
+        {EVENT_FEED_SKELETON_KEYS.map((key) => (
+          <Skeleton key={key} className="h-32" />
         ))}
       </div>
     );
@@ -85,7 +122,11 @@ export function EventFeed({ endpointSlug }: EventFeedProps) {
       ) : (
         <div className="space-y-3">
           {allEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
+            <EventCard
+              key={event.id}
+              event={event}
+              endpointSlug={endpointSlug}
+            />
           ))}
         </div>
       )}

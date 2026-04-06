@@ -1,18 +1,63 @@
+import type { Account } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
+
+/** GitHub user object returned by OAuth (subset used for JWT seeding). */
+type GithubOAuthProfile = {
+  id: string | number;
+  email?: string | null;
+  name?: string | null;
+  login?: string;
+  avatar_url?: string;
+};
+
+const parseGithubProfile = (
+  profile: unknown,
+): GithubOAuthProfile | null => {
+  if (!profile || typeof profile !== "object" || !("id" in profile)) {
+    return null;
+  }
+  const { id, email, name, login, avatar_url } = profile as GithubOAuthProfile;
+  if (typeof id === "string" || typeof id === "number") {
+    return { id, email, name, login, avatar_url };
+  }
+  return null;
+};
+
+const seedTokenFromGithubAccount = (
+  token: JWT,
+  account: Account,
+  profile: unknown,
+): void => {
+  const gh = parseGithubProfile(profile);
+  if (!gh) return;
+
+  const { id, email, name, login, avatar_url } = gh;
+  const { access_token } = account;
+  const githubId = String(id);
+
+  token.id = githubId;
+  token.githubId = githubId;
+  token.accessToken = access_token;
+  token.email = email;
+  token.name = name ?? login;
+  token.picture = avatar_url;
+};
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GithubProvider({
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      profile(profile) {
+      profile: ({ id, name, login, email, avatar_url }) => {
+        const githubId = id.toString();
         return {
-          id: profile.id.toString(),
-          name: profile.name || profile.login,
-          email: profile.email,
-          image: profile.avatar_url,
-          githubId: profile.id.toString(),
+          id: githubId,
+          githubId,
+          name: name || login,
+          email,
+          image: avatar_url,
         };
       },
     }),
@@ -21,27 +66,32 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user, account, profile }) {
-      // Initial sign in - store GitHub data in JWT
-      if (account && profile) {
-        token.id = profile.id.toString();
-        token.githubId = profile.id.toString();
-        token.accessToken = account.access_token;
-        token.email = profile.email;
-        token.name = profile.name || (profile as any).login;
-        token.picture = (profile as any).avatar_url;
+    jwt: async ({ token, account, profile }) => {
+      if (account) {
+        seedTokenFromGithubAccount(token, account, profile);
       }
-
       return token;
     },
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).githubId = token.githubId;
-        (session.user as any).accessToken = token.accessToken;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.image = token.picture as string;
+    session: async ({ session, token }) => {
+      const { user } = session;
+      if (user) {
+        const {
+          id,
+          githubId,
+          accessToken,
+          email,
+          name,
+          picture,
+        } = token;
+
+        Object.assign(user, {
+          id,
+          githubId,
+          accessToken,
+          email: email as string,
+          name: name as string,
+          image: picture as string,
+        });
       }
       return session;
     },

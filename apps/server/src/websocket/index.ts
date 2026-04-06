@@ -1,9 +1,13 @@
 import { Server } from "socket.io";
 import { createClient } from "redis";
 import { getWebhookChannel } from "../redis/pubsub.js";
+import type { StoredWebhookEvent } from "../redis/event-store.js";
 import { logger } from "../utils/logger.js";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+
+/** One Redis listener per channel; duplicate subscribe() calls would deliver the same message N times. */
+const redisChannelsWithListener = new Set<string>();
 
 export function initializeWebSocket(io: Server) {
   const redisSubClient = createClient({ url: REDIS_URL });
@@ -30,19 +34,22 @@ export function initializeWebSocket(io: Server) {
 
       const channel = getWebhookChannel(endpointSlug);
 
-      // Subscribe to the Redis channel (Redis will handle duplicate subscriptions automatically)
-      try {
-        await redisSubClient.subscribe(channel, (message) => {
-          const event = JSON.parse(message);
-          io.to(room).emit("webhook-event", event);
-          logger.debug("📨 Pushed event to room", { 
-            eventId: event.id, 
-            room, 
-            endpointSlug 
+      if (!redisChannelsWithListener.has(channel)) {
+        redisChannelsWithListener.add(channel);
+        try {
+          await redisSubClient.subscribe(channel, (message) => {
+            const event = JSON.parse(message) as StoredWebhookEvent;
+            const roomName = `endpoint:${event.endpointSlug}`;
+            io.to(roomName).emit("webhook-event", event);
+            logger.debug("📨 Pushed event to room", {
+              eventId: event.id,
+              room: roomName,
+            });
           });
-        });
-      } catch {
-        logger.debug("Already subscribed to channel", { channel });
+        } catch (error) {
+          redisChannelsWithListener.delete(channel);
+          logger.error("Redis subscribe failed", { channel, error });
+        }
       }
 
       socket.emit("subscribed", { endpointSlug });

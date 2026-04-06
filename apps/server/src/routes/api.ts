@@ -1,36 +1,45 @@
 import { Router } from "express";
-import { getRecentEvents, getEventById } from "../redis/event-store.js";
+import { nanoid } from "nanoid";
+import { ZodError } from "zod";
+import {
+  getRecentEvents,
+  getEventById,
+  replaceWebhookEvent,
+  type StoredWebhookEvent,
+} from "../redis/event-store.js";
 import {
   storeEndpoint,
   getEndpoints,
   deleteEndpoint,
+  getEndpointBySlug,
 } from "../redis/endpoint-store.js";
 import { authenticateJWT, AuthRequest } from "../middleware/auth.js";
 import { logger } from "../utils/logger.js";
-
-// Unique string ID generator for JavaScript.
-import { nanoid } from "nanoid";
+import {
+  analyzeWebhookPayload,
+  isOpenAiConfigured,
+} from "../services/payload-analyzer.js";
 
 export const apiRouter = Router();
 
 apiRouter.get("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
+  const { userId } = req;
   try {
-    const userId = req.userId!;
     logger.info("📋 Fetching endpoints for user", { userId });
-    const endpoints = await getEndpoints(userId);
+    const endpoints = await getEndpoints(userId!);
     logger.info("📋 Found endpoints", { userId, count: endpoints.length });
-    res.json(endpoints);
+    return res.json(endpoints);
   } catch (error) {
-    logger.error("Error fetching endpoints", { error, userId: req.userId });
-    res.status(500).json({ error: "Failed to fetch endpoints" });
+    logger.error("Error fetching endpoints", { error, userId });
+    return res.status(500).json({ error: "Failed to fetch endpoints" });
   }
 });
 
 apiRouter.post("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
-  try {
-    const { name, description, forwardingUrl, webhookSecret } = req.body;
-    const userId = req.userId!;
+  const { body, userId } = req;
+  const { name, description, forwardingUrl, webhookSecret } = body;
 
+  try {
     const endpoint = {
       id: nanoid(), // ex:- aB3kLm9PqR
       slug: nanoid(10),
@@ -39,48 +48,55 @@ apiRouter.post("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
       forwardingUrl: forwardingUrl || null,
       webhookSecret: webhookSecret || null, // For signature verification
       secretKey: nanoid(32), // ex:- V1StGXR8_Z5jdHi6B-myT3kLm9PqR2x
-      userId,
+      userId: userId!,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     await storeEndpoint(endpoint);
-    logger.info("✅ Endpoint created", { 
-      endpointId: endpoint.id, 
-      slug: endpoint.slug, 
+    logger.info("✅ Endpoint created", {
+      endpointId: endpoint.id,
+      slug: endpoint.slug,
       userId,
       hasWebhookSecret: !!webhookSecret,
     });
 
-    res.json(endpoint);
+    return res.json(endpoint);
   } catch (error) {
-    logger.error("Error creating endpoint", { error, userId: req.userId });
-    res.status(500).json({ error: "Failed to create endpoint" });
+    logger.error("Error creating endpoint", { error, userId });
+    return res.status(500).json({ error: "Failed to create endpoint" });
   }
 });
 
 apiRouter.get("/endpoints/:slug/events", async (req, res) => {
+  const { slug: slugParam } = req.params;
+  const slug = String(slugParam);
+  const { limit: limitQuery } = req.query;
+  const limitParam = Array.isArray(limitQuery) ? limitQuery[0] : limitQuery;
+
   try {
-    const { slug } = req.params;
-    const limitParam = Array.isArray(req.query.limit) 
-      ? req.query.limit[0] 
-      : req.query.limit;
-    const limit = Number.parseInt(limitParam || "50", 10);
+    const limit = Number.parseInt(String(limitParam ?? "50"), 10);
 
     const events = await getRecentEvents(slug, limit);
-    logger.debug("Fetched events for endpoint", { slug, count: events.length, limit });
-    res.json(events);
+    logger.debug("Fetched events for endpoint", {
+      slug,
+      count: events.length,
+      limit,
+    });
+    return res.json(events);
   } catch (error) {
-    logger.error("Error fetching events", { error, slug: req.params.slug });
-    res.status(500).json({ error: "Failed to fetch events" });
+    logger.error("Error fetching events", { error, slug });
+    return res.status(500).json({ error: "Failed to fetch events" });
   }
 });
 
 apiRouter.get("/endpoints/:slug/events/:eventId", async (req, res) => {
-  try {
-    const { slug, eventId } = req.params;
+  const { slug: slugParam, eventId: eventIdParam } = req.params;
+  const slug = String(slugParam);
+  const eventId = String(eventIdParam);
 
+  try {
     const event = await getEventById(slug, eventId);
 
     if (!event) {
@@ -88,79 +104,170 @@ apiRouter.get("/endpoints/:slug/events/:eventId", async (req, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
 
-    res.json(event);
+    return res.json(event);
   } catch (error) {
-    logger.error("Error fetching event", { 
-      error, 
-      slug: req.params.slug, 
-      eventId: req.params.eventId 
+    logger.error("Error fetching event", {
+      error,
+      slug,
+      eventId,
     });
-    res.status(500).json({ error: "Failed to fetch event" });
+    return res.status(500).json({ error: "Failed to fetch event" });
   }
 });
 
-apiRouter.patch("/endpoints/:id", authenticateJWT, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.userId!;
-    const { webhookSecret, forwardingUrl, name, description, isActive } = req.body;
+apiRouter.post(
+  "/endpoints/:slug/events/:eventId/analyze",
+  authenticateJWT,
+  async (req: AuthRequest, res) => {
+    const { slug: slugParam, eventId: eventIdParam } = req.params;
+    const slug = String(slugParam);
+    const eventId = String(eventIdParam);
+    const { userId, body = {} } = req;
+    const { regenerate } = body as { regenerate?: boolean };
 
-    // Get existing endpoint
-    const endpoints = await getEndpoints(userId);
-    const endpoint = endpoints.find(e => e.id === id);
+    try {
+      if (!isOpenAiConfigured()) {
+        return res.status(503).json({
+          error:
+            "AI analysis is not configured. Set OPENAI_API_KEY on the API server.",
+        });
+      }
 
-    if (!endpoint) {
-      return res.status(404).json({ error: "Endpoint not found" });
+      const endpoint = await getEndpointBySlug(slug);
+      if (endpoint?.userId !== userId) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
+
+      const event = await getEventById(slug, eventId);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      if (event.aiAnalysis && !regenerate) {
+        return res.json(event);
+      }
+
+      const {
+        method,
+        contentType,
+        body: rawBody,
+        headers,
+        signatureVerification,
+      } = event;
+
+      const analysis = await analyzeWebhookPayload({
+        method,
+        contentType,
+        body: rawBody,
+        headers,
+        signatureProviderHint: signatureVerification?.provider,
+      });
+
+      const updated: StoredWebhookEvent = { ...event, aiAnalysis: analysis };
+      const persisted = await replaceWebhookEvent(slug, eventId, updated);
+      if (!persisted) {
+        return res.status(500).json({ error: "Failed to persist analysis" });
+      }
+
+      logger.info("AI payload analysis stored", { slug, eventId, userId });
+      return res.json(updated);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        logger.warn("AI output failed schema validation", {
+          issues: error.issues,
+          slug,
+          eventId,
+        });
+        return res.status(502).json({
+          error:
+            "The model returned data we could not parse. Try Regenerate or a different payload.",
+        });
+      }
+      logger.error("AI payload analysis failed", {
+        error,
+        slug,
+        eventId,
+      });
+      const message =
+        error instanceof Error ? error.message : "Analysis failed";
+      return res.status(500).json({ error: message });
     }
+  },
+);
 
-    if (endpoint.userId !== userId) {
-      return res.status(403).json({ error: "Unauthorized" });
+apiRouter.patch(
+  "/endpoints/:id",
+  authenticateJWT,
+  async (req: AuthRequest, res) => {
+    const { params, body, userId } = req;
+    const { id: idParam } = params;
+    const id = String(idParam);
+    const { webhookSecret, forwardingUrl, name, description, isActive } = body;
+
+    try {
+      const endpoints = await getEndpoints(userId!);
+      const endpoint = endpoints.find((e) => e.id === id);
+
+      if (!endpoint) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
+
+      if (endpoint.userId !== userId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const updatedEndpoint = {
+        ...endpoint,
+        webhookSecret:
+          webhookSecret === undefined ? endpoint.webhookSecret : webhookSecret,
+        forwardingUrl:
+          forwardingUrl === undefined ? endpoint.forwardingUrl : forwardingUrl,
+        name: name === undefined ? endpoint.name : name,
+        description:
+          description === undefined ? endpoint.description : description,
+        isActive: isActive === undefined ? endpoint.isActive : isActive,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await storeEndpoint(updatedEndpoint);
+      logger.info("✏️ Endpoint updated", {
+        endpointId: id,
+        userId,
+        updatedFields: Object.keys(body),
+      });
+
+      return res.json(updatedEndpoint);
+    } catch (error) {
+      logger.error("Error updating endpoint", {
+        error,
+        endpointId: id,
+        userId,
+      });
+      return res.status(500).json({ error: "Failed to update endpoint" });
     }
+  },
+);
 
-    // Update endpoint
-    const updatedEndpoint = {
-      ...endpoint,
-      webhookSecret: webhookSecret !== undefined ? webhookSecret : endpoint.webhookSecret,
-      forwardingUrl: forwardingUrl !== undefined ? forwardingUrl : endpoint.forwardingUrl,
-      name: name !== undefined ? name : endpoint.name,
-      description: description !== undefined ? description : endpoint.description,
-      isActive: isActive !== undefined ? isActive : endpoint.isActive,
-      updatedAt: new Date().toISOString(),
-    };
+apiRouter.delete(
+  "/endpoints/:id",
+  authenticateJWT,
+  async (req: AuthRequest, res) => {
+    const { params, userId } = req;
+    const { id: idParam } = params;
+    const id = String(idParam);
 
-    await storeEndpoint(updatedEndpoint);
-    logger.info("✏️ Endpoint updated", { 
-      endpointId: id, 
-      userId,
-      updatedFields: Object.keys(req.body),
-    });
+    try {
+      await deleteEndpoint(id, userId!);
+      logger.info("🗑️ Endpoint deleted", { endpointId: id, userId });
 
-    res.json(updatedEndpoint);
-  } catch (error) {
-    logger.error("Error updating endpoint", { 
-      error, 
-      endpointId: req.params.id, 
-      userId: req.userId 
-    });
-    res.status(500).json({ error: "Failed to update endpoint" });
-  }
-});
-
-apiRouter.delete("/endpoints/:id", authenticateJWT, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.userId!;
-
-    await deleteEndpoint(id, userId);
-    logger.info("🗑️ Endpoint deleted", { endpointId: id, userId });
-
-    res.json({ success: true });
-  } catch (error) {
-    logger.error("Error deleting endpoint", { 
-      error, 
-      endpointId: req.params.id, 
-      userId: req.userId 
-    });
-    res.status(500).json({ error: "Failed to delete endpoint" });
-  }
-});
+      return res.json({ success: true });
+    } catch (error) {
+      logger.error("Error deleting endpoint", {
+        error,
+        endpointId: id,
+        userId,
+      });
+      return res.status(500).json({ error: "Failed to delete endpoint" });
+    }
+  },
+);

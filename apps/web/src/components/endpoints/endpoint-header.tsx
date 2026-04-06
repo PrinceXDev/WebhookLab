@@ -35,7 +35,10 @@ export function EndpointHeader({ slug }: EndpointHeaderProps) {
         </div>
 
         <p className="text-sm text-muted-foreground">
-          Send webhooks to this URL. Events will appear below in real-time.
+          Send webhooks to this URL. Events appear below in real time. Expand an
+          event and use{" "}
+          <span className="font-medium text-foreground">AI payload insights</span>{" "}
+          to detect the provider, explain the event, and copy a starter handler.
         </p>
       </div>
     </div>

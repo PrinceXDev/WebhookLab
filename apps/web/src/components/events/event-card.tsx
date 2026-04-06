@@ -1,11 +1,13 @@
 'use client';
 
+import type { AiPayloadAnalysis } from '@webhooklab/shared';
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { PayloadAnalysisPanel } from './payload-analysis-panel';
 import { SignatureBadge } from './signature-badge';
 import { cn } from '@/lib/utils';
 
@@ -24,9 +26,16 @@ interface WebhookEvent {
     algorithm?: string;
     message?: string;
   };
+  aiAnalysis?: AiPayloadAnalysis;
 }
 
-export function EventCard({ event }: { event: WebhookEvent }) {
+export function EventCard({
+  event,
+  endpointSlug,
+}: {
+  event: WebhookEvent;
+  endpointSlug: string;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const getMethodColor = (method: string) => {
@@ -69,6 +78,12 @@ export function EventCard({ event }: { event: WebhookEvent }) {
 
         {expanded && (
           <div className="mt-4 space-y-4">
+            <PayloadAnalysisPanel
+              endpointSlug={endpointSlug}
+              eventId={event.id}
+              analysis={event.aiAnalysis}
+            />
+
             {event.signatureVerification && event.signatureVerification.status !== 'not_applicable' && (
               <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border">
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
