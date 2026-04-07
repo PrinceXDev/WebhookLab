@@ -22,13 +22,13 @@ import { apiClient } from "@/lib/api-client";
 import type { EndpointRecord } from "@/types/endpoint";
 import { EndpointFormDialog } from "./endpoint-form-dialog";
 
-export function EndpointActions({
+export const EndpointActions = ({
   endpoint,
   onDeleted,
 }: {
   endpoint: EndpointRecord;
   onDeleted?: () => void;
-}) {
+}) => {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -129,4 +129,4 @@ export function EndpointActions({
       </Dialog>
     </>
   );
-}
+};

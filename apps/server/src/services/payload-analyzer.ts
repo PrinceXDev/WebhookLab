@@ -74,21 +74,34 @@ Analyze the webhook request JSON the user sends next. Respond with ONLY a single
     "code": "A concise handler sketch: verify signature if applicable, parse payload, switch on event type, idempotent processing. Use comments inside the code. No markdown.",
     "notes": "optional: verification, retries, or idempotency tips"
   },
-  "keyFields": [ { "name": "field", "value": "short value" } ]
+  "keyFields": [ { "name": "field", "value": "short value" } ],
+  "anomalyDetection": {
+    "score": 0-100 (0=normal, 100=highly anomalous),
+    "level": "none" | "low" | "medium" | "high",
+    "flags": ["list of anomaly indicators like 'unusual_amount', 'unexpected_field', 'suspicious_timing', 'malformed_data', 'missing_required_fields'"],
+    "explanation": "Brief explanation of why this is or isn't anomalous"
+  },
+  "businessIntent": "What business action this webhook should trigger (e.g., 'trigger order fulfillment', 'send confirmation email', 'update user subscription')",
+  "suggestedActions": ["List of 2-4 concrete next steps like 'Update order status to processing', 'Send receipt to customer', 'Trigger inventory sync'"]
 }
 
 Rules:
 - If unknown provider, lower confidence and say so in plainEnglishSummary.
 - keyFields: at most 8 entries for the most important values (ids, types, amounts).
-- suggestedHandler.code must be valid-looking source in the chosen language only.`;
+- suggestedHandler.code must be valid-looking source in the chosen language only.
+- Anomaly detection: Look for unusual patterns, unexpected values, missing fields, suspicious data, timing issues.
+- Business intent: Identify the core business purpose of this webhook event.`;
 
-export async function analyzeWebhookPayload(input: {
-  method: string;
-  contentType: string;
-  body: string;
-  headers: Record<string, string>;
-  signatureProviderHint?: string;
-}): Promise<AiPayloadAnalysis> {
+export async function analyzeWebhookPayload(
+  input: {
+    method: string;
+    contentType: string;
+    body: string;
+    headers: Record<string, string>;
+    signatureProviderHint?: string;
+  },
+  previousEvent?: { body: string; aiAnalysis?: AiPayloadAnalysis },
+): Promise<AiPayloadAnalysis> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
@@ -101,18 +114,27 @@ export async function analyzeWebhookPayload(input: {
     ...(baseURL ? { baseURL } : {}),
   });
 
+  const messages: Array<{ role: "system" | "user"; content: string }> = [
+    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: `Analyze this webhook request:\n${buildUserPayload(input)}`,
+    },
+  ];
+
+  if (previousEvent) {
+    messages.push({
+      role: "user",
+      content: `For change detection, here is the previous event body:\n${previousEvent.body.substring(0, MAX_BODY_CHARS)}\n\nCompare it with the current event and identify what changed.`,
+    });
+  }
+
   const completion = await client.chat.completions.create({
     model,
     temperature: 0.2,
     max_completion_tokens: 4096,
     response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Analyze this webhook request:\n${buildUserPayload(input)}`,
-      },
-    ],
+    messages,
   });
 
   const raw = completion.choices[0]?.message?.content;

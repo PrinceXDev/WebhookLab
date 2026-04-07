@@ -4,8 +4,19 @@ import type { AiPayloadAnalysis } from "@webhooklab/shared";
 import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
+import type { TimelineStage } from "@/constants/timeline";
 import { EventCard } from "./event-card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { EventFiltersComponent, type EventFilters } from "./event-filters";
+
+interface ForwardingResult {
+  targetUrl: string;
+  statusCode?: number;
+  responseBody?: string;
+  responseHeaders?: Record<string, string>;
+  latencyMs?: number;
+  error?: string;
+  attemptedAt: number;
+}
 
 interface WebhookEvent {
   id: string;
@@ -23,23 +34,27 @@ interface WebhookEvent {
     message?: string;
   };
   aiAnalysis?: AiPayloadAnalysis;
+  timeline?: TimelineStage[];
+  forwardingResult?: ForwardingResult;
+  retryCount?: number;
+  totalDurationMs?: number;
 }
 
 interface EventFeedProps {
   endpointSlug: string;
 }
 
-const EVENT_FEED_SKELETON_KEYS = [
-  "event-feed-skeleton-1",
-  "event-feed-skeleton-2",
-  "event-feed-skeleton-3",
-] as const;
+const emptyFilters = (): EventFilters => ({
+  status: new Set(),
+  providers: new Set(),
+  methods: new Set(),
+});
 
 /** One row per event id: historical first, then live overlays; keep aiAnalysis if present on either. */
-function mergeEventsDeduped(
+const mergeEventsDeduped = (
   live: WebhookEvent[],
   historical: WebhookEvent[] | undefined,
-): WebhookEvent[] {
+): WebhookEvent[] => {
   const byId = new Map<string, WebhookEvent>();
   for (const e of historical ?? []) {
     byId.set(e.id, e);
@@ -58,10 +73,27 @@ function mergeEventsDeduped(
     );
   }
   return [...byId.values()].sort((a, b) => b.timestamp - a.timestamp);
-}
+};
 
-export function EventFeed({ endpointSlug }: EventFeedProps) {
+const getEventStatus = (
+  event: WebhookEvent,
+): "success" | "error" | "processing" => {
+  if (!event.timeline || event.timeline.length === 0) {
+    return "processing";
+  }
+  const hasError = event.timeline.some((stage) => stage.status === "error");
+  if (hasError) {
+    return "error";
+  }
+  const allDone = event.timeline.every(
+    (stage) => stage.status === "done" || stage.status === "error",
+  );
+  return allDone ? "success" : "processing";
+};
+
+export const EventFeed = ({ endpointSlug }: EventFeedProps) => {
   const [liveEvents, setLiveEvents] = useState<WebhookEvent[]>([]);
+  const [filters, setFilters] = useState<EventFilters>(emptyFilters);
 
   const { data: historicalEvents, isLoading } = useQuery<WebhookEvent[]>({
     queryKey: ["events", endpointSlug],
@@ -89,41 +121,110 @@ export function EventFeed({ endpointSlug }: EventFeedProps) {
 
   const allEvents = mergeEventsDeduped(liveEvents, historicalEvents);
 
+  const filteredEvents = allEvents.filter((event) => {
+    const { status: statusFilter, providers, methods } = filters;
+    if (statusFilter.size > 0) {
+      const status = getEventStatus(event);
+      if (!statusFilter.has(status)) {
+        return false;
+      }
+    }
+
+    if (providers.size > 0) {
+      const provider = event.signatureVerification?.provider ?? "unknown";
+      if (!providers.has(provider)) {
+        return false;
+      }
+    }
+
+    if (methods.size > 0 && !methods.has(event.method)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const availableProviders = Array.from(
+    new Set(
+      allEvents.map((e) => e.signatureVerification?.provider ?? "unknown"),
+    ),
+  );
+
+  const availableMethods = Array.from(new Set(allEvents.map((e) => e.method)));
+
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {EVENT_FEED_SKELETON_KEYS.map((key) => (
-          <Skeleton key={key} className="h-32" />
-        ))}
+        <div className="flex flex-col items-center justify-center py-16 space-y-4">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            <svg
+              className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-lg font-semibold">Loading Webhook Events</p>
+            <p className="text-sm text-muted-foreground">
+              Fetching recent webhook activity...
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Events ({allEvents.length})</h2>
-        <div className="flex items-center gap-2">
-          <div
-            className={`h-2 w-2 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
-          />
-          <span className="text-sm text-muted-foreground">
-            {isConnected ? "Live" : "Disconnected"}
-          </span>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold">
+            {`Events (${filteredEvents.length}${
+              filteredEvents.length !== allEvents.length
+                ? ` of ${allEvents.length}`
+                : ""
+            })`}
+          </h2>
+          <div className="flex items-center gap-2">
+            <div
+              className={`h-2 w-2 rounded-full ${
+                isConnected ? "bg-green-500" : "bg-red-500"
+              }`}
+            />
+            <span className="text-sm text-muted-foreground">
+              {isConnected ? "Live" : "Disconnected"}
+            </span>
+          </div>
         </div>
+
+        <EventFiltersComponent
+          filters={filters}
+          onFiltersChange={setFilters}
+          availableProviders={availableProviders}
+          availableMethods={availableMethods}
+        />
       </div>
 
-      {allEvents.length === 0 ? (
+      {filteredEvents.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed rounded-lg">
           <p className="text-muted-foreground">
-            No webhooks received yet. Send a POST request to your endpoint URL.
+            {allEvents.length === 0
+              ? "No webhooks received yet. Send a POST request to your endpoint URL."
+              : "No events match the current filters."}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {allEvents.map((event) => (
+          {filteredEvents.map((event) => (
             <EventCard
               key={event.id}
               event={event}
@@ -134,4 +235,4 @@ export function EventFeed({ endpointSlug }: EventFeedProps) {
       )}
     </div>
   );
-}
+};

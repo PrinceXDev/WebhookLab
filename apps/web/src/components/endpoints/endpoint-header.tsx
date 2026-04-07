@@ -13,7 +13,7 @@ interface EndpointHeaderProps {
   slug: string;
 }
 
-export function EndpointHeader({ slug }: EndpointHeaderProps) {
+export const EndpointHeader = ({ slug }: EndpointHeaderProps) => {
   const router = useRouter();
   const webhookUrl = `${process.env.NEXT_PUBLIC_API_URL}/hook/${slug}`;
 
@@ -65,7 +65,9 @@ export function EndpointHeader({ slug }: EndpointHeaderProps) {
 
       <div className="mt-6 space-y-4">
         <div className="flex items-center gap-2 rounded-lg bg-slate-100 p-4 dark:bg-slate-800">
-          <code className="flex-1 break-all font-mono text-sm">{webhookUrl}</code>
+          <code className="flex-1 break-all font-mono text-sm">
+            {webhookUrl}
+          </code>
           <Button
             type="button"
             size="icon"
@@ -80,10 +82,12 @@ export function EndpointHeader({ slug }: EndpointHeaderProps) {
         <p className="text-sm text-muted-foreground">
           Send webhooks to this URL. Events appear below in real time. Expand an
           event and use{" "}
-          <span className="font-medium text-foreground">AI payload insights</span>{" "}
+          <span className="font-medium text-foreground">
+            AI payload insights
+          </span>{" "}
           to detect the provider, explain the event, and copy a starter handler.
         </p>
       </div>
     </div>
   );
-}
+};

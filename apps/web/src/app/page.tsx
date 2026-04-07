@@ -1,12 +1,12 @@
-import Link from 'next/link';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { Button } from '@/components/ui/button';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { SignInButton } from '@/components/auth/sign-in-button';
-import { Github } from 'lucide-react';
+import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { SignInButton } from "@/components/auth/sign-in-button";
+import { Github } from "lucide-react";
 
-export default async function HomePage() {
+const HomePage = async () => {
   const session = await getServerSession(authOptions);
 
   return (
@@ -33,41 +33,15 @@ export default async function HomePage() {
               </Button>
             </Link>
           ) : (
-            <SignInButton>
-              <Button size="lg" className="text-lg px-8">
-                <Github className="mr-2 h-5 w-5" />
-                Sign in with GitHub
-              </Button>
+            <SignInButton size="lg" className="text-lg px-8">
+              <Github className="mr-2 h-5 w-5" />
+              Sign in with GitHub
             </SignInButton>
           )}
-          <Link href="/docs">
-            <Button size="lg" variant="outline" className="text-lg px-8">
-              Documentation
-            </Button>
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
-          <div className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-            <h3 className="font-semibold text-lg mb-2">⚡ Real-time</h3>
-            <p className="text-sm text-muted-foreground">
-              Webhooks appear live on your dashboard via WebSocket in under 50ms
-            </p>
-          </div>
-          <div className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-            <h3 className="font-semibold text-lg mb-2">🔄 Replay</h3>
-            <p className="text-sm text-muted-foreground">
-              One-click replay of any webhook with full headers and body preservation
-            </p>
-          </div>
-          <div className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-            <h3 className="font-semibold text-lg mb-2">🤖 AI-Powered</h3>
-            <p className="text-sm text-muted-foreground">
-              Claude AI analyzes payloads and suggests handler implementations
-            </p>
-          </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default HomePage;

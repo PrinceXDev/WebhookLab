@@ -12,7 +12,7 @@ import { Copy } from "lucide-react";
 import type { EndpointRecord } from "@/types/endpoint";
 import { EndpointActions } from "./endpoint-actions";
 
-export function EndpointCard({ endpoint }: { endpoint: EndpointRecord }) {
+export const EndpointCard = ({ endpoint }: { endpoint: EndpointRecord }) => {
   const webhookUrl = `${process.env.NEXT_PUBLIC_API_URL}/hook/${endpoint.slug}`;
 
   const copyToClipboard = () => {
@@ -65,4 +65,4 @@ export function EndpointCard({ endpoint }: { endpoint: EndpointRecord }) {
       </CardContent>
     </Card>
   );
-}
+};

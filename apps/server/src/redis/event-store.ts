@@ -4,6 +4,32 @@ import { redisClient } from "./client.js";
 const MAX_EVENTS_PER_ENDPOINT = 500;
 const EVENT_TTL_SECONDS = 72 * 60 * 60; // 72 hours
 
+export type TimelineStageStatus = "pending" | "active" | "done" | "error";
+export type TimelineStageName =
+  | "received"
+  | "verified"
+  | "parsed"
+  | "forwarded"
+  | "responded";
+
+export interface TimelineStage {
+  name: TimelineStageName;
+  status: TimelineStageStatus;
+  timestamp: number;
+  durationMs?: number;
+  error?: string;
+}
+
+export interface ForwardingResult {
+  targetUrl: string;
+  statusCode?: number;
+  responseBody?: string;
+  responseHeaders?: Record<string, string>;
+  latencyMs?: number;
+  error?: string;
+  attemptedAt: number;
+}
+
 export interface StoredWebhookEvent {
   id: string;
   endpointSlug: string;
@@ -22,12 +48,16 @@ export interface StoredWebhookEvent {
     message?: string;
   };
   aiAnalysis?: AiPayloadAnalysis;
+  timeline?: TimelineStage[];
+  forwardingResult?: ForwardingResult;
+  retryCount?: number;
+  totalDurationMs?: number;
 }
 
-export async function storeWebhookEvent(
+export const storeWebhookEvent = async (
   endpointSlug: string,
   event: StoredWebhookEvent,
-): Promise<void> {
+): Promise<void> => {
   const key = `webhook:${endpointSlug}:events`;
   const timestamp = Date.now();
 
@@ -39,45 +69,45 @@ export async function storeWebhookEvent(
   await redisClient.zRemRangeByRank(key, 0, -(MAX_EVENTS_PER_ENDPOINT + 1));
 
   await redisClient.expire(key, EVENT_TTL_SECONDS);
-}
+};
 
-export async function getRecentEvents(
+export const getRecentEvents = async (
   endpointSlug: string,
   limit: number = 50,
-): Promise<StoredWebhookEvent[]> {
+): Promise<StoredWebhookEvent[]> => {
   const key = `webhook:${endpointSlug}:events`;
 
   const events = await redisClient.zRange(key, -limit, -1, { REV: true });
 
   return events.map((event) => JSON.parse(event));
-}
+};
 
-export async function getEventById(
+export const getEventById = async (
   endpointSlug: string,
   eventId: string,
-): Promise<StoredWebhookEvent | null> {
+): Promise<StoredWebhookEvent | null> => {
   const key = `webhook:${endpointSlug}:events`;
   const events = await redisClient.zRange(key, 0, -1);
 
   const event = events.find((e) => {
-    const parsed = JSON.parse(e);
-    return parsed.id === eventId;
+    const { id } = JSON.parse(e) as StoredWebhookEvent;
+    return id === eventId;
   });
 
   return event ? JSON.parse(event) : null;
-}
+};
 
-export async function getEventCount(endpointSlug: string): Promise<number> {
+export const getEventCount = async (endpointSlug: string): Promise<number> => {
   const key = `webhook:${endpointSlug}:events`;
   return await redisClient.zCard(key);
-}
+};
 
 /** Replace a stored event member (same id + timestamp) after e.g. attaching AI analysis. */
-export async function replaceWebhookEvent(
+export const replaceWebhookEvent = async (
   endpointSlug: string,
   eventId: string,
   updated: StoredWebhookEvent,
-): Promise<boolean> {
+): Promise<boolean> => {
   const key = `webhook:${endpointSlug}:events`;
   const members = await redisClient.zRange(key, 0, -1);
 
@@ -94,4 +124,4 @@ export async function replaceWebhookEvent(
   }
 
   return false;
-}
+};

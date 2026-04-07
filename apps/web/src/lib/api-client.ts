@@ -1,20 +1,18 @@
-export async function fetchWithAuth(url: string, options: RequestInit = {}) {
+export const fetchWithAuth = (url: string, options: RequestInit = {}) => {
   return fetch(url, {
     ...options,
     credentials: "include",
   });
-}
+};
 
 const baseUrl = () => process.env.NEXT_PUBLIC_API_URL ?? "";
 
-function url(path: string) {
-  return `${baseUrl()}${path}`;
-}
+const url = (path: string) => `${baseUrl()}${path}`;
 
-async function readErrorMessage(
+const readErrorMessage = async (
   response: Response,
   fallback: string,
-): Promise<string> {
+): Promise<string> => {
   try {
     const body: unknown = await response.json();
     if (
@@ -24,18 +22,25 @@ async function readErrorMessage(
       typeof (body as { error: unknown }).error === "string"
     ) {
       const msg = (body as { error: string }).error;
-      if (msg.length > 0) {return msg;}
+      if (msg.length > 0) {
+        return msg;
+      }
     }
   } catch {
     /* empty or non-JSON body */
   }
   return fallback;
-}
+};
 
-async function ensureOk(response: Response, fallback: string): Promise<void> {
-  if (response.ok) {return;}
+const ensureOk = async (
+  response: Response,
+  fallback: string,
+): Promise<void> => {
+  if (response.ok) {
+    return;
+  }
   throw new Error(await readErrorMessage(response, fallback));
-}
+};
 
 export const apiClient = {
   get: async <T = unknown>(path: string): Promise<T> => {

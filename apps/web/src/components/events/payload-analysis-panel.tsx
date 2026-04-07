@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { Check, Copy, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  AlertTriangle,
+  TrendingUp,
+} from "lucide-react";
 import { useState } from "react";
 
 const STEPS = [
@@ -17,9 +25,9 @@ const STEPS = [
   { key: "handler", label: "Handler code" },
 ] as const;
 
-function confidenceVariant(
+const confidenceVariant = (
   c: AiPayloadAnalysis["providerConfidence"],
-): "default" | "secondary" | "outline" {
+): "default" | "secondary" | "outline" => {
   if (c === "high") {
     return "default";
   }
@@ -27,22 +35,24 @@ function confidenceVariant(
     return "secondary";
   }
   return "outline";
-}
+};
 
-export function PayloadAnalysisPanel({
-  endpointSlug,
-  eventId,
-  analysis,
-}: {
+type PayloadAnalysisPanelProps = {
   endpointSlug: string;
   eventId: string;
   analysis?: AiPayloadAnalysis;
-}) {
+};
+
+export const PayloadAnalysisPanel = ({
+  endpointSlug,
+  eventId,
+  analysis,
+}: PayloadAnalysisPanelProps) => {
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: async (regenerate: boolean) => {
+    mutationFn: (regenerate: boolean) => {
       return apiClient.post<{ id: string; aiAnalysis?: AiPayloadAnalysis }>(
         `/api/endpoints/${endpointSlug}/events/${eventId}/analyze`,
         { regenerate },
@@ -66,14 +76,13 @@ export function PayloadAnalysisPanel({
 
   const run = (regenerate: boolean) => mutation.mutate(regenerate);
 
-  const active = analysis;
-  const pending = mutation.isPending;
+  const { isPending: pending } = mutation;
 
   const copyCode = async () => {
-    if (!active?.suggestedHandler.code) {
+    if (!analysis?.suggestedHandler.code) {
       return;
     }
-    await navigator.clipboard.writeText(active.suggestedHandler.code);
+    await navigator.clipboard.writeText(analysis.suggestedHandler.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -86,7 +95,7 @@ export function PayloadAnalysisPanel({
           <h4 className="text-sm font-semibold">AI payload insights</h4>
         </div>
         <div className="flex flex-wrap gap-2">
-          {active ? (
+          {analysis ? (
             <Button
               type="button"
               variant="outline"
@@ -124,7 +133,7 @@ export function PayloadAnalysisPanel({
         aria-label="Analysis flow"
       >
         {STEPS.map((step, i) => {
-          const done = Boolean(active) && !pending;
+          const done = Boolean(analysis) && !pending;
           return (
             <li
               key={step.key}
@@ -150,22 +159,30 @@ export function PayloadAnalysisPanel({
       </ol>
 
       {pending && (
-        <p className="text-xs text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-          Sending payload to the model (headers + body). This may take a few
-          seconds.
-        </p>
+        <div className="flex flex-col items-center justify-center py-8 space-y-4">
+          <div className="relative">
+            <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            <Sparkles className="h-6 w-6 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-sm font-medium">Analyzing Webhook Payload</p>
+            <p className="text-xs text-muted-foreground max-w-md">
+              AI is examining the payload structure, detecting providers, and
+              generating insights. This may take a few seconds...
+            </p>
+          </div>
+        </div>
       )}
 
-      {active && (
+      {analysis && (
         <div className="space-y-4 pt-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">
               Detected provider
             </span>
-            <Badge variant="secondary">{active.providerGuess}</Badge>
-            <Badge variant={confidenceVariant(active.providerConfidence)}>
-              {active.providerConfidence} confidence
+            <Badge variant="secondary">{analysis.providerGuess}</Badge>
+            <Badge variant={confidenceVariant(analysis.providerConfidence)}>
+              {analysis.providerConfidence} confidence
             </Badge>
           </div>
 
@@ -173,9 +190,9 @@ export function PayloadAnalysisPanel({
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
               Event
             </p>
-            <p className="font-mono text-sm">{active.eventType}</p>
+            <p className="font-mono text-sm">{analysis.eventType}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              {active.eventTypeDescription}
+              {analysis.eventTypeDescription}
             </p>
           </div>
 
@@ -184,17 +201,135 @@ export function PayloadAnalysisPanel({
               Plain English
             </p>
             <p className="text-sm leading-relaxed">
-              {active.plainEnglishSummary}
+              {analysis.plainEnglishSummary}
             </p>
           </div>
 
-          {active.keyFields && active.keyFields.length > 0 && (
+          {analysis.anomalyDetection &&
+            analysis.anomalyDetection.level !== "none" && (
+              <div
+                className={cn(
+                  "rounded-lg border p-3",
+                  analysis.anomalyDetection.level === "high" &&
+                    "border-red-500 bg-red-50 dark:bg-red-950",
+                  analysis.anomalyDetection.level === "medium" &&
+                    "border-orange-500 bg-orange-50 dark:bg-orange-950",
+                  analysis.anomalyDetection.level === "low" &&
+                    "border-yellow-500 bg-yellow-50 dark:bg-yellow-950",
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle
+                    className={cn(
+                      "h-4 w-4 mt-0.5",
+                      analysis.anomalyDetection.level === "high" &&
+                        "text-red-600",
+                      analysis.anomalyDetection.level === "medium" &&
+                        "text-orange-600",
+                      analysis.anomalyDetection.level === "low" &&
+                        "text-yellow-600",
+                    )}
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide mb-1">
+                      Anomaly Detected (Score: {analysis.anomalyDetection.score}
+                      /100)
+                    </p>
+                    <p className="text-sm mb-2">
+                      {analysis.anomalyDetection.explanation}
+                    </p>
+                    {analysis.anomalyDetection.flags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {analysis.anomalyDetection.flags.map((flag) => (
+                          <Badge
+                            key={flag}
+                            variant="outline"
+                            className="text-xs"
+                          >
+                            {flag.replaceAll("_", " ")}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {analysis.businessIntent && (
+            <div className="rounded-lg border border-blue-500 bg-blue-50 dark:bg-blue-950 p-3">
+              <div className="flex items-start gap-2">
+                <TrendingUp className="h-4 w-4 mt-0.5 text-blue-600" />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 uppercase tracking-wide mb-1">
+                    Business Intent
+                  </p>
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                    {analysis.businessIntent}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {analysis.suggestedActions &&
+            analysis.suggestedActions.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Suggested Actions
+                </p>
+                <ul className="space-y-1">
+                  {analysis.suggestedActions.map((action, index) => (
+                    <li key={index} className="flex items-start gap-2 text-sm">
+                      <span className="text-primary mt-1">•</span>
+                      <span>{action}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+          {analysis.changeDetection && analysis.changeDetection.hasChanges && (
+            <div className="rounded-lg border border-purple-500 bg-purple-50 dark:bg-purple-950 p-3">
+              <p className="text-xs font-semibold text-purple-900 dark:text-purple-100 uppercase tracking-wide mb-2">
+                Changes from Previous Event
+              </p>
+              <p className="text-sm text-purple-900 dark:text-purple-100 mb-2">
+                {analysis.changeDetection.summary}
+              </p>
+              {analysis.changeDetection.changes.length > 0 && (
+                <div className="space-y-1">
+                  {analysis.changeDetection.changes.map((change, index) => (
+                    <div
+                      key={index}
+                      className="text-xs font-mono bg-white/50 dark:bg-black/50 rounded px-2 py-1"
+                    >
+                      <Badge variant="outline" className="mr-2">
+                        {change.changeType}
+                      </Badge>
+                      <span className="font-semibold">{change.field}</span>
+                      {change.previousValue && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          from {change.previousValue}
+                        </span>
+                      )}
+                      <span className="text-muted-foreground"> to </span>
+                      <span>{change.currentValue}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {analysis.keyFields && analysis.keyFields.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                 Notable fields
               </p>
               <dl className="grid gap-1 text-xs sm:grid-cols-2">
-                {active.keyFields.map((f) => (
+                {analysis.keyFields.map((f) => (
                   <div
                     key={f.name}
                     className="flex gap-2 rounded bg-muted/50 px-2 py-1"
@@ -212,7 +347,7 @@ export function PayloadAnalysisPanel({
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Suggested handler ({active.suggestedHandler.language})
+                Suggested handler ({analysis.suggestedHandler.language})
               </p>
               <Button
                 type="button"
@@ -229,22 +364,22 @@ export function PayloadAnalysisPanel({
                 <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
               </Button>
             </div>
-            {active.suggestedHandler.notes ? (
+            {analysis.suggestedHandler.notes ? (
               <p className="text-xs text-muted-foreground mb-2">
-                {active.suggestedHandler.notes}
+                {analysis.suggestedHandler.notes}
               </p>
             ) : null}
             <pre className="text-xs bg-slate-100 dark:bg-slate-900 p-3 rounded overflow-x-auto max-h-72 overflow-y-auto whitespace-pre-wrap">
-              {active.suggestedHandler.code}
+              {analysis.suggestedHandler.code}
             </pre>
           </div>
 
           <p className="text-[10px] text-muted-foreground">
-            Model: {active.model} ·{" "}
-            {new Date(active.analyzedAt).toLocaleString()}
+            Model: {analysis.model} ·{" "}
+            {new Date(analysis.analyzedAt).toLocaleString()}
           </p>
         </div>
       )}
     </div>
   );
-}
+};

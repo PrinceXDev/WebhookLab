@@ -1,15 +1,43 @@
-'use client';
+"use client";
 
-import type { AiPayloadAnalysis } from '@webhooklab/shared';
-import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { PayloadAnalysisPanel } from './payload-analysis-panel';
-import { SignatureBadge } from './signature-badge';
-import { cn } from '@/lib/utils';
+import type { AiPayloadAnalysis } from "@webhooklab/shared";
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { SignatureBadge } from "./signature-badge";
+import { LatencyBar, shouldShowLatencyBar } from "./latency-bar";
+import { EventDetailsTabs } from "./event-details-tabs";
+import { TimelineViewToggle } from "./timeline-view-toggle";
+import { cn } from "@/lib/utils";
+
+type TimelineStageStatus = "pending" | "active" | "done" | "error";
+type TimelineStageName =
+  | "received"
+  | "verified"
+  | "parsed"
+  | "forwarded"
+  | "responded";
+
+interface TimelineStage {
+  name: TimelineStageName;
+  status: TimelineStageStatus;
+  timestamp: number;
+  durationMs?: number;
+  error?: string;
+}
+
+interface ForwardingResult {
+  targetUrl: string;
+  statusCode?: number;
+  responseBody?: string;
+  responseHeaders?: Record<string, string>;
+  latencyMs?: number;
+  error?: string;
+  attemptedAt: number;
+}
 
 interface WebhookEvent {
   id: string;
@@ -27,40 +55,90 @@ interface WebhookEvent {
     message?: string;
   };
   aiAnalysis?: AiPayloadAnalysis;
+  timeline?: TimelineStage[];
+  forwardingResult?: ForwardingResult;
+  retryCount?: number;
+  totalDurationMs?: number;
 }
 
-export function EventCard({
+export const EventCard = ({
   event,
   endpointSlug,
 }: {
   event: WebhookEvent;
   endpointSlug: string;
-}) {
+}) => {
   const [expanded, setExpanded] = useState(false);
 
   const getMethodColor = (method: string) => {
     const colors: Record<string, string> = {
-      GET: 'bg-blue-500',
-      POST: 'bg-green-500',
-      PUT: 'bg-yellow-500',
-      PATCH: 'bg-orange-500',
-      DELETE: 'bg-red-500',
+      GET: "bg-blue-500",
+      POST: "bg-green-500",
+      PUT: "bg-yellow-500",
+      PATCH: "bg-orange-500",
+      DELETE: "bg-red-500",
     };
-    return colors[method] || 'bg-gray-500';
+    return colors[method] || "bg-gray-500";
+  };
+
+  const getStatusBadge = () => {
+    if (!event.timeline || event.timeline.length === 0) {
+      return null;
+    }
+
+    const hasError = event.timeline.some((stage) => stage.status === "error");
+    const allDone = event.timeline.every(
+      (stage) => stage.status === "done" || stage.status === "error",
+    );
+
+    if (hasError) {
+      return (
+        <Badge variant="destructive" className="text-xs">
+          Error
+        </Badge>
+      );
+    }
+
+    if (allDone) {
+      return (
+        <Badge variant="default" className="bg-green-500 text-xs">
+          Success
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="secondary" className="text-xs">
+        Processing
+      </Badge>
+    );
   };
 
   return (
-    <Card>
+    <Card className={cn("transition-all", expanded && "ring-2 ring-primary")}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 flex-wrap">
-            <Badge className={getMethodColor(event.method)}>{event.method}</Badge>
+            <Badge className={getMethodColor(event.method)}>
+              {event.method}
+            </Badge>
+            {getStatusBadge()}
             <SignatureBadge verification={event.signatureVerification} />
+
+            {event.totalDurationMs !== undefined && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                <span>{event.totalDurationMs}ms</span>
+              </div>
+            )}
+
             <span className="text-sm font-mono text-muted-foreground">
               {event.id}
             </span>
             <span className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(event.timestamp), { addSuffix: true })}
+              {formatDistanceToNow(new Date(event.timestamp), {
+                addSuffix: true,
+              })}
             </span>
           </div>
           <Button
@@ -77,67 +155,35 @@ export function EventCard({
         </div>
 
         {expanded && (
-          <div className="mt-4 space-y-4">
-            <PayloadAnalysisPanel
-              endpointSlug={endpointSlug}
-              eventId={event.id}
-              analysis={event.aiAnalysis}
-            />
-
-            {event.signatureVerification && event.signatureVerification.status !== 'not_applicable' && (
-              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border">
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                  Signature Verification
-                </h4>
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Provider:</span>
-                    <span className="font-medium">{event.signatureVerification.provider.toUpperCase()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status:</span>
-                    <span className={cn(
-                      'font-medium',
-                      event.signatureVerification.isValid ? 'text-green-600' : 'text-red-600'
-                    )}>
-                      {event.signatureVerification.status.toUpperCase()}
-                    </span>
-                  </div>
-                  {event.signatureVerification.algorithm && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Algorithm:</span>
-                      <span className="font-medium">{event.signatureVerification.algorithm}</span>
-                    </div>
-                  )}
-                  {event.signatureVerification.message && (
-                    <div className="mt-2 pt-2 border-t">
-                      <p className="text-muted-foreground">{event.signatureVerification.message}</p>
-                    </div>
-                  )}
-                </div>
+          <div className="mt-6 space-y-6">
+            {event.timeline && event.timeline.length > 0 && (
+              <div className="rounded-lg border bg-card p-4">
+                <TimelineViewToggle
+                  timeline={event.timeline}
+                  totalDurationMs={event.totalDurationMs}
+                />
               </div>
             )}
-            
-            <div>
-              <h4 className="text-sm font-semibold mb-2">Headers</h4>
-              <pre className="text-xs bg-slate-100 dark:bg-slate-900 p-3 rounded overflow-x-auto">
-                {JSON.stringify(event.headers, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold mb-2">Body</h4>
-              <pre className="text-xs bg-slate-100 dark:bg-slate-900 p-3 rounded overflow-x-auto max-h-64 overflow-y-auto">
-                {event.body || '(empty)'}
-              </pre>
-            </div>
-            <div className="flex gap-2 text-xs text-muted-foreground">
-              <span>IP: {event.sourceIp}</span>
-              <span>•</span>
-              <span>Type: {event.contentType}</span>
+
+            {shouldShowLatencyBar(event.timeline, event.totalDurationMs) && (
+              <div className="rounded-lg border bg-card p-4">
+                <LatencyBar
+                  timeline={event.timeline}
+                  totalDurationMs={event.totalDurationMs}
+                />
+              </div>
+            )}
+
+            <div className="rounded-lg border bg-card p-4">
+              <EventDetailsTabs
+                event={event}
+                endpointSlug={endpointSlug}
+                redisTtl="72h"
+              />
             </div>
           </div>
         )}
       </CardContent>
     </Card>
   );
-}
+};

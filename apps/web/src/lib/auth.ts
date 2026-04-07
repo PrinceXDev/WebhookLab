@@ -65,13 +65,13 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    jwt: async ({ token, account, profile }) => {
+    jwt: ({ token, account, profile }) => {
       if (account) {
         seedTokenFromGithubAccount(token, account, profile);
       }
       return token;
     },
-    session: async ({ session, token }) => {
+    session: ({ session, token }) => {
       const { user } = session;
       if (user) {
         const { id, githubId, accessToken, email, name, picture } = token;

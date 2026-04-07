@@ -3,7 +3,7 @@
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 
-export function SetupBanner() {
+export const SetupBanner = () => {
   const isConfigured =
     process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID &&
     process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID !== "your-github-oauth-client-id";
@@ -35,4 +35,4 @@ export function SetupBanner() {
       </div>
     </div>
   );
-}
+};

@@ -7,18 +7,22 @@ import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import type { EndpointRecord } from "@/types/endpoint";
 
-export function EndpointList() {
-  const { data: endpoints, isLoading, isError } = useQuery<EndpointRecord[]>({
-    queryKey: ['endpoints'],
+export const EndpointList = () => {
+  const {
+    data: endpoints,
+    isLoading,
+    isError,
+  } = useQuery<EndpointRecord[]>({
+    queryKey: ["endpoints"],
     queryFn: async () => {
       try {
         return await apiClient.get<EndpointRecord[]>("/api/endpoints");
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : 'Failed to load endpoints';
+          err instanceof Error ? err.message : "Failed to load endpoints";
         toast({
-          variant: 'destructive',
-          title: 'Failed to load endpoints',
+          variant: "destructive",
+          title: "Failed to load endpoints",
           description: message,
         });
         throw err;
@@ -61,4 +65,4 @@ export function EndpointList() {
       ))}
     </div>
   );
-}
+};

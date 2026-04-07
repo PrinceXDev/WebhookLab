@@ -6,6 +6,7 @@ import {
   getRecentEvents,
   getEventById,
   replaceWebhookEvent,
+  storeWebhookEvent,
   type StoredWebhookEvent,
 } from "../redis/event-store.js";
 import {
@@ -14,6 +15,7 @@ import {
   deleteEndpoint,
   getEndpointBySlug,
 } from "../redis/endpoint-store.js";
+import { publishWebhookEvent } from "../redis/pubsub.js";
 import { authenticateJWT, AuthRequest } from "../middleware/auth.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -33,12 +35,9 @@ export const apiRouter = Router();
 apiRouter.get("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
   const { userId } = req;
   try {
-    logger.info("📋 Fetching endpoints for user", { userId });
     const endpoints = await getEndpoints(userId!);
-    logger.info("📋 Found endpoints", { userId, count: endpoints.length });
     return res.json(endpoints);
-  } catch (error) {
-    logger.error("Error fetching endpoints", { error, userId });
+  } catch {
     return res.status(500).json({ error: "Failed to fetch endpoints" });
   }
 });
@@ -63,16 +62,8 @@ apiRouter.post("/endpoints", authenticateJWT, async (req: AuthRequest, res) => {
     };
 
     await storeEndpoint(endpoint);
-    logger.info("✅ Endpoint created", {
-      endpointId: endpoint.id,
-      slug: endpoint.slug,
-      userId,
-      hasWebhookSecret: !!webhookSecret,
-    });
-
     return res.json(endpoint);
-  } catch (error) {
-    logger.error("Error creating endpoint", { error, userId });
+  } catch {
     return res.status(500).json({ error: "Failed to create endpoint" });
   }
 });
@@ -250,19 +241,9 @@ apiRouter.patch(
       };
 
       await storeEndpoint(updatedEndpoint);
-      logger.info("✏️ Endpoint updated", {
-        endpointId: id,
-        userId,
-        updatedFields: Object.keys(patch),
-      });
 
       return res.json(updatedEndpoint);
-    } catch (error) {
-      logger.error("Error updating endpoint", {
-        error,
-        endpointId: id,
-        userId,
-      });
+    } catch {
       return res.status(500).json({ error: "Failed to update endpoint" });
     }
   },
@@ -281,7 +262,6 @@ apiRouter.delete(
       if (!deleted) {
         return res.status(404).json({ error: "Endpoint not found" });
       }
-      logger.info("🗑️ Endpoint deleted", { endpointId: id, userId });
 
       return res.json({ success: true });
     } catch (error) {
@@ -289,12 +269,244 @@ apiRouter.delete(
       if (message.includes("Unauthorized")) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      logger.error("Error deleting endpoint", {
-        error,
-        endpointId: id,
-        userId,
-      });
       return res.status(500).json({ error: "Failed to delete endpoint" });
     }
   },
 );
+
+apiRouter.post(
+  "/endpoints/:slug/events/:eventId/replay",
+  authenticateJWT,
+  async (req: AuthRequest, res) => {
+    const { slug: slugParam, eventId: eventIdParam } = req.params;
+    const slug = String(slugParam);
+    const eventId = String(eventIdParam);
+    const { userId } = req;
+
+    try {
+      const endpoint = await getEndpointBySlug(slug);
+      if (!endpoint) {
+        return res.status(404).json({ error: "Endpoint not found" });
+      }
+
+      if (endpoint.userId !== userId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const originalEvent = await getEventById(slug, eventId);
+      if (!originalEvent) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      if (!endpoint.forwardingUrl) {
+        return res.status(400).json({
+          error: "No forwarding URL configured for this endpoint",
+        });
+      }
+
+      const { forwardWebhook } =
+        await import("../services/webhook-forwarder.js");
+
+      const startTime = Date.now();
+      const forwardingResult = await forwardWebhook(
+        endpoint.forwardingUrl,
+        originalEvent.method,
+        originalEvent.headers,
+        originalEvent.body,
+      );
+
+      const totalDurationMs = Date.now() - startTime;
+
+      const replayEvent: StoredWebhookEvent = {
+        ...originalEvent,
+        id: nanoid(),
+        timestamp: startTime,
+        retryCount: (originalEvent.retryCount || 0) + 1,
+        forwardingResult,
+        totalDurationMs,
+        timeline: [
+          {
+            name: "received",
+            status: "done",
+            timestamp: startTime,
+            durationMs: 0,
+          },
+          {
+            name: "verified",
+            status: originalEvent.signatureVerification?.isValid
+              ? "done"
+              : "error",
+            timestamp: startTime + 1,
+            durationMs: 0,
+          },
+          {
+            name: "parsed",
+            status: "done",
+            timestamp: startTime + 2,
+            durationMs: 0,
+          },
+          {
+            name: "forwarded",
+            status: forwardingResult.error ? "error" : "done",
+            timestamp: forwardingResult.attemptedAt,
+            durationMs: forwardingResult.latencyMs,
+            error: forwardingResult.error,
+          },
+          ...(forwardingResult.statusCode
+            ? [
+                {
+                  name: "responded" as const,
+                  status: "done" as const,
+                  timestamp: Date.now(),
+                  durationMs: 0,
+                },
+              ]
+            : []),
+        ],
+      };
+
+      await storeWebhookEvent(slug, replayEvent);
+      await publishWebhookEvent(slug, replayEvent);
+
+      logger.info("Event replayed successfully", {
+        originalEventId: eventId,
+        replayEventId: replayEvent.id,
+        slug,
+        userId,
+      });
+
+      return res.json({
+        success: true,
+        replayEvent,
+        originalEventId: eventId,
+      });
+    } catch (error) {
+      logger.error("Error replaying event", {
+        error,
+        slug,
+        eventId,
+      });
+      return res.status(500).json({ error: "Failed to replay event" });
+    }
+  },
+);
+
+apiRouter.get("/endpoints/:slug/stats", async (req, res) => {
+  const { slug: slugParam } = req.params;
+  const slug = String(slugParam);
+
+  try {
+    const events = await getRecentEvents(slug, 500);
+
+    const latencies = events
+      .filter((e) => e.totalDurationMs !== undefined)
+      .map((e) => e.totalDurationMs as number);
+
+    if (latencies.length === 0) {
+      return res.json({
+        count: 0,
+        p50: null,
+        p95: null,
+        p99: null,
+        min: null,
+        max: null,
+        avg: null,
+      });
+    }
+
+    const sorted = [...latencies].sort((a, b) => a - b);
+    const count = sorted.length;
+
+    const percentile = (p: number) => {
+      const index = Math.ceil((p / 100) * count) - 1;
+      const value = sorted[Math.max(0, index)];
+      return value !== undefined ? value : 0;
+    };
+
+    const sum = sorted.reduce((acc, val) => acc + val, 0);
+    const avg = sum / count;
+
+    const stageStats = new Map<
+      string,
+      { durations: number[]; count: number }
+    >();
+
+    for (const event of events) {
+      if (event.timeline) {
+        for (const stage of event.timeline) {
+          if (stage.durationMs !== undefined && stage.durationMs > 0) {
+            if (!stageStats.has(stage.name)) {
+              stageStats.set(stage.name, { durations: [], count: 0 });
+            }
+            const stats = stageStats.get(stage.name)!;
+            stats.durations.push(stage.durationMs);
+            stats.count++;
+          }
+        }
+      }
+    }
+
+    const stageLatencies: Record<
+      string,
+      { p50: number; p95: number; p99: number; avg: number; count: number }
+    > = {};
+
+    for (const [stageName, stats] of stageStats.entries()) {
+      const sortedDurations = [...stats.durations].sort((a, b) => a - b);
+      const stageCount = sortedDurations.length;
+
+      if (stageCount > 0) {
+        const stagePercentile = (p: number) => {
+          const index = Math.ceil((p / 100) * stageCount) - 1;
+          const value = sortedDurations[Math.max(0, index)];
+          return value !== undefined ? value : 0;
+        };
+
+        const stageSum = sortedDurations.reduce((acc, val) => acc + val, 0);
+        const stageAvg = stageSum / stageCount;
+
+        stageLatencies[stageName] = {
+          p50: stagePercentile(50),
+          p95: stagePercentile(95),
+          p99: stagePercentile(99),
+          avg: Math.round(stageAvg * 100) / 100,
+          count: stageCount,
+        };
+      }
+    }
+
+    const successCount = events.filter((e) => {
+      if (!e.timeline) {
+        return false;
+      }
+      return !e.timeline.some((stage) => stage.status === "error");
+    }).length;
+
+    const errorCount = events.filter((e) => {
+      if (!e.timeline) {
+        return false;
+      }
+      return e.timeline.some((stage) => stage.status === "error");
+    }).length;
+
+    return res.json({
+      count,
+      p50: percentile(50),
+      p95: percentile(95),
+      p99: percentile(99),
+      min: sorted[0],
+      max: sorted[count - 1],
+      avg: Math.round(avg * 100) / 100,
+      stageLatencies,
+      successRate:
+        events.length > 0
+          ? Math.round((successCount / events.length) * 10000) / 100
+          : 0,
+      successCount,
+      errorCount,
+    });
+  } catch (error) {
+    logger.error("Error calculating stats", { error, slug });
+    return res.status(500).json({ error: "Failed to calculate statistics" });
+  }
+});

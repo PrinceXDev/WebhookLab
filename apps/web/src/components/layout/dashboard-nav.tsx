@@ -15,7 +15,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LogOut, Settings, User } from "lucide-react";
 import Image from "next/image";
 
-export function DashboardNav() {
+export const DashboardNav = () => {
   const { data: session } = useSession();
 
   return (
@@ -89,4 +89,4 @@ export function DashboardNav() {
       </div>
     </nav>
   );
-}
+};
