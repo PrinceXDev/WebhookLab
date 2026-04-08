@@ -92,6 +92,12 @@ Rules:
 - Anomaly detection: Look for unusual patterns, unexpected values, missing fields, suspicious data, timing issues.
 - Business intent: Identify the core business purpose of this webhook event.`;
 
+// 1. Call OpenAI API
+// 2. Parse response with Zod schema
+// 3. Add metadata (analyzedAt, model)
+// 4. Return typed analysis
+
+// Update event in Redis
 export async function analyzeWebhookPayload(
   input: {
     method: string;

@@ -1,14 +1,8 @@
-"use client";
-
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 
 export const SetupBanner = () => {
-  const isConfigured =
-    process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID &&
-    process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID !== "your-github-oauth-client-id";
-
-  if (isConfigured) {
+  if (process.env.GITHUB_CLIENT_ID?.trim() !== "") {
     return null;
   }
 
@@ -20,15 +14,27 @@ export const SetupBanner = () => {
           <div className="flex-1">
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
               <strong>Setup Required:</strong> GitHub OAuth is not configured.
-              Follow the{" "}
+              Add{" "}
+              <code className="rounded bg-yellow-100 px-1 py-0.5 text-xs dark:bg-yellow-900/40">
+                GITHUB_CLIENT_ID
+              </code>{" "}
+              and{" "}
+              <code className="rounded bg-yellow-100 px-1 py-0.5 text-xs dark:bg-yellow-900/40">
+                GITHUB_CLIENT_SECRET
+              </code>{" "}
+              to{" "}
+              <code className="rounded bg-yellow-100 px-1 py-0.5 text-xs dark:bg-yellow-900/40">
+                .env.local
+              </code>{" "}
+              (create an app in{" "}
               <Link
                 href="https://github.com/settings/developers"
                 target="_blank"
                 className="underline font-semibold hover:text-yellow-900 dark:hover:text-yellow-100"
               >
-                AUTH_SETUP.md guide
-              </Link>{" "}
-              to enable authentication.
+                GitHub developer settings
+              </Link>
+              ).
             </p>
           </div>
         </div>

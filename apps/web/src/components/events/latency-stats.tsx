@@ -46,7 +46,7 @@ const formatMs = (ms: number | null) => {
   return `${ms}ms`;
 };
 
-export const LatencyStats = ({ endpointSlug }: LatencyStatsProps) => {
+const LatencyStats = ({ endpointSlug }: LatencyStatsProps) => {
   const { data: stats, isLoading } = useQuery<StatsResponse>({
     queryKey: ["stats", endpointSlug],
     queryFn: async () => {
@@ -275,3 +275,5 @@ const StatCard = ({ label, sublabel, value, icon, tooltip }: StatCardProps) => {
     </div>
   );
 };
+
+export default LatencyStats;

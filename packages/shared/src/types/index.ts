@@ -11,18 +11,6 @@ export interface Endpoint {
   updatedAt: Date;
 }
 
-export interface WebhookEvent {
-  id: string;
-  endpointSlug: string;
-  method: string;
-  headers: Record<string, string>;
-  body: string;
-  queryParams?: Record<string, string>;
-  sourceIp: string;
-  contentType: string;
-  timestamp: number;
-}
-
 export interface ReplayLog {
   id: string;
   eventId: string;

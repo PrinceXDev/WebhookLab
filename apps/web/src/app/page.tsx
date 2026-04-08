@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { SignInButton } from "@/components/auth/sign-in-button";
-import { Github } from "lucide-react";
+import { GithubMarkIcon } from "@/components/icons/github-mark";
 
 const HomePage = async () => {
   const session = await getServerSession(authOptions);
@@ -34,7 +34,7 @@ const HomePage = async () => {
             </Link>
           ) : (
             <SignInButton size="lg" className="text-lg px-8">
-              <Github className="mr-2 h-5 w-5" />
+              <GithubMarkIcon className="mr-2 h-5 w-5" />
               Sign in with GitHub
             </SignInButton>
           )}

@@ -97,6 +97,8 @@ const listeners = new Set<() => void>();
 
 let memoryState: State = { toasts: [] };
 
+const serverSnapshot: State = { toasts: [] };
+
 const dispatch = (action: Action): void => {
   memoryState = reducer(memoryState, action);
   listeners.forEach((listener) => listener());
@@ -167,7 +169,7 @@ const useToast = () => {
       };
     },
     () => memoryState,
-    () => ({ toasts: [] }),
+    () => serverSnapshot,
   );
 
   return {

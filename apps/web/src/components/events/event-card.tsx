@@ -1,7 +1,7 @@
 "use client";
 
-import type { AiPayloadAnalysis } from "@webhooklab/shared";
 import { useState } from "react";
+import type { WebhookEvent } from "@webhooklab/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,54 +12,6 @@ import { LatencyBar, shouldShowLatencyBar } from "./latency-bar";
 import { EventDetailsTabs } from "./event-details-tabs";
 import { TimelineViewToggle } from "./timeline-view-toggle";
 import { cn } from "@/lib/utils";
-
-type TimelineStageStatus = "pending" | "active" | "done" | "error";
-type TimelineStageName =
-  | "received"
-  | "verified"
-  | "parsed"
-  | "forwarded"
-  | "responded";
-
-interface TimelineStage {
-  name: TimelineStageName;
-  status: TimelineStageStatus;
-  timestamp: number;
-  durationMs?: number;
-  error?: string;
-}
-
-interface ForwardingResult {
-  targetUrl: string;
-  statusCode?: number;
-  responseBody?: string;
-  responseHeaders?: Record<string, string>;
-  latencyMs?: number;
-  error?: string;
-  attemptedAt: number;
-}
-
-interface WebhookEvent {
-  id: string;
-  method: string;
-  headers: Record<string, string>;
-  body: string;
-  sourceIp: string;
-  contentType: string;
-  timestamp: number;
-  signatureVerification?: {
-    provider: string;
-    isValid: boolean;
-    status: string;
-    algorithm?: string;
-    message?: string;
-  };
-  aiAnalysis?: AiPayloadAnalysis;
-  timeline?: TimelineStage[];
-  forwardingResult?: ForwardingResult;
-  retryCount?: number;
-  totalDurationMs?: number;
-}
 
 export const EventCard = ({
   event,

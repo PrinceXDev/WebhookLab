@@ -44,17 +44,24 @@ const seedTokenFromGithubAccount = (
   token.picture = avatar_url;
 };
 
+const getEnvVariable = (key: string): string => {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Missing environment variable: ${key}`);
+  }
+  return value;
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GithubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      profile: ({ id, name, login, email, avatar_url }) => {
-        const githubId = id.toString();
+      clientId: getEnvVariable("GITHUB_CLIENT_ID"),
+      clientSecret: getEnvVariable("GITHUB_CLIENT_SECRET"),
+      profile: ({ id, githubId, name, email, avatar_url }) => {
         return {
-          id: githubId,
+          id,
           githubId,
-          name: name || login,
+          name,
           email,
           image: avatar_url,
         };

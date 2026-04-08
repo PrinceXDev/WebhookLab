@@ -1,101 +1,17 @@
 "use client";
 
-import type { AiPayloadAnalysis } from "@webhooklab/shared";
 import { useCallback, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { WebhookEvent } from "@webhooklab/shared";
 import { useWebSocket } from "@/hooks/use-websocket";
-import type { TimelineStage } from "@/constants/timeline";
 import { EventCard } from "./event-card";
 import { EventFiltersComponent, type EventFilters } from "./event-filters";
 
-interface ForwardingResult {
-  targetUrl: string;
-  statusCode?: number;
-  responseBody?: string;
-  responseHeaders?: Record<string, string>;
-  latencyMs?: number;
-  error?: string;
-  attemptedAt: number;
-}
-
-interface WebhookEvent {
-  id: string;
-  method: string;
-  headers: Record<string, string>;
-  body: string;
-  sourceIp: string;
-  contentType: string;
-  timestamp: number;
-  signatureVerification?: {
-    provider: string;
-    isValid: boolean;
-    status: string;
-    algorithm?: string;
-    message?: string;
-  };
-  aiAnalysis?: AiPayloadAnalysis;
-  timeline?: TimelineStage[];
-  forwardingResult?: ForwardingResult;
-  retryCount?: number;
-  totalDurationMs?: number;
-}
-
-interface EventFeedProps {
-  endpointSlug: string;
-}
-
-const emptyFilters = (): EventFilters => ({
-  status: new Set(),
-  providers: new Set(),
-  methods: new Set(),
-});
-
-/** One row per event id: historical first, then live overlays; keep aiAnalysis if present on either. */
-const mergeEventsDeduped = (
-  live: WebhookEvent[],
-  historical: WebhookEvent[] | undefined,
-): WebhookEvent[] => {
-  const byId = new Map<string, WebhookEvent>();
-  for (const e of historical ?? []) {
-    byId.set(e.id, e);
-  }
-  for (const e of live) {
-    const existing = byId.get(e.id);
-    byId.set(
-      e.id,
-      existing
-        ? {
-            ...existing,
-            ...e,
-            aiAnalysis: e.aiAnalysis ?? existing.aiAnalysis,
-          }
-        : e,
-    );
-  }
-  return [...byId.values()].sort((a, b) => b.timestamp - a.timestamp);
-};
-
-const getEventStatus = (
-  event: WebhookEvent,
-): "success" | "error" | "processing" => {
-  if (!event.timeline || event.timeline.length === 0) {
-    return "processing";
-  }
-  const hasError = event.timeline.some((stage) => stage.status === "error");
-  if (hasError) {
-    return "error";
-  }
-  const allDone = event.timeline.every(
-    (stage) => stage.status === "done" || stage.status === "error",
-  );
-  return allDone ? "success" : "processing";
-};
-
-export const EventFeed = ({ endpointSlug }: EventFeedProps) => {
-  const [liveEvents, setLiveEvents] = useState<WebhookEvent[]>([]);
+const EventFeed = ({ endpointSlug }: { endpointSlug: string }) => {
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<EventFilters>(emptyFilters);
 
-  const { data: historicalEvents, isLoading } = useQuery<WebhookEvent[]>({
+  const { data: events = [], isLoading } = useQuery<WebhookEvent[]>({
     queryKey: ["events", endpointSlug],
     queryFn: async () => {
       const res = await fetch(
@@ -108,20 +24,33 @@ export const EventFeed = ({ endpointSlug }: EventFeedProps) => {
     },
   });
 
-  const handleEvent = useCallback((event: WebhookEvent) => {
-    setLiveEvents((prev) => {
-      if (prev.some((e) => e.id === event.id)) {
-        return prev;
-      }
-      return [event, ...prev];
-    });
-  }, []);
+  const handleEvent = useCallback(
+    (event: WebhookEvent) => {
+      queryClient.setQueryData<WebhookEvent[]>(
+        ["events", endpointSlug],
+        (oldEvents = []) => {
+          const existingIndex = oldEvents.findIndex((e) => e.id === event.id);
+
+          if (existingIndex >= 0) {
+            const updated = [...oldEvents];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              ...event,
+              aiAnalysis: event.aiAnalysis ?? updated[existingIndex].aiAnalysis,
+            };
+            return updated;
+          }
+
+          return [event, ...oldEvents];
+        },
+      );
+    },
+    [queryClient, endpointSlug],
+  );
 
   const { isConnected } = useWebSocket(endpointSlug, handleEvent);
 
-  const allEvents = mergeEventsDeduped(liveEvents, historicalEvents);
-
-  const filteredEvents = allEvents.filter((event) => {
+  const filteredEvents = events.filter((event) => {
     const { status: statusFilter, providers, methods } = filters;
     if (statusFilter.size > 0) {
       const status = getEventStatus(event);
@@ -145,12 +74,10 @@ export const EventFeed = ({ endpointSlug }: EventFeedProps) => {
   });
 
   const availableProviders = Array.from(
-    new Set(
-      allEvents.map((e) => e.signatureVerification?.provider ?? "unknown"),
-    ),
+    new Set(events.map((e) => e.signatureVerification?.provider ?? "unknown")),
   );
 
-  const availableMethods = Array.from(new Set(allEvents.map((e) => e.method)));
+  const availableMethods = Array.from(new Set(events.map((e) => e.method)));
 
   if (isLoading) {
     return (
@@ -189,9 +116,9 @@ export const EventFeed = ({ endpointSlug }: EventFeedProps) => {
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold">
             {`Events (${filteredEvents.length}${
-              filteredEvents.length !== allEvents.length
-                ? ` of ${allEvents.length}`
-                : ""
+              filteredEvents.length === events.length
+                ? ""
+                : ` of ${events.length}`
             })`}
           </h2>
           <div className="flex items-center gap-2">
@@ -217,7 +144,7 @@ export const EventFeed = ({ endpointSlug }: EventFeedProps) => {
       {filteredEvents.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed rounded-lg">
           <p className="text-muted-foreground">
-            {allEvents.length === 0
+            {events.length === 0
               ? "No webhooks received yet. Send a POST request to your endpoint URL."
               : "No events match the current filters."}
           </p>
@@ -236,3 +163,27 @@ export const EventFeed = ({ endpointSlug }: EventFeedProps) => {
     </div>
   );
 };
+
+const emptyFilters = (): EventFilters => ({
+  status: new Set(),
+  providers: new Set(),
+  methods: new Set(),
+});
+
+const getEventStatus = (
+  event: WebhookEvent,
+): "success" | "error" | "processing" => {
+  if (!event.timeline || event.timeline.length === 0) {
+    return "processing";
+  }
+  const hasError = event.timeline.some((stage) => stage.status === "error");
+  if (hasError) {
+    return "error";
+  }
+  const allDone = event.timeline.every(
+    (stage) => stage.status === "done" || stage.status === "error",
+  );
+  return allDone ? "success" : "processing";
+};
+
+export default EventFeed;

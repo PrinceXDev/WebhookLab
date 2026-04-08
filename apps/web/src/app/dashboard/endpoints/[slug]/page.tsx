@@ -1,9 +1,9 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { EventFeed } from "@/components/events/event-feed";
-import { EndpointHeader } from "@/components/endpoints/endpoint-header";
-import { LatencyStats } from "@/components/events/latency-stats";
+import EventFeed from "@/components/events/event-feed";
+import EndpointHeader from "@/components/endpoints/endpoint-header";
+import LatencyStats from "@/components/events/latency-stats";
 
 const EndpointDetailPage = () => {
   const params = useParams();

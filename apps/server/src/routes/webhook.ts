@@ -116,7 +116,6 @@ webhookRouter.use("/:slug", async (req, res) => {
     };
 
     await storeWebhookEvent(slug, event);
-    await publishWebhookEvent(slug, event);
 
     res.status(200).json({
       success: true,
@@ -190,6 +189,7 @@ webhookRouter.use("/:slug", async (req, res) => {
         totalDurationMs,
       };
       await replaceWebhookEvent(slug, event.id, updatedEvent);
+      await publishWebhookEvent(slug, updatedEvent);
     }
 
     logger.info("📥 Webhook received", {
