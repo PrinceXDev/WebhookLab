@@ -1,7 +1,7 @@
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 
-export const SetupBanner = () => {
+const SetupBanner = () => {
   if (process.env.GITHUB_CLIENT_ID?.trim() !== "") {
     return null;
   }
@@ -42,3 +42,5 @@ export const SetupBanner = () => {
     </div>
   );
 };
+
+export default SetupBanner;

@@ -30,7 +30,7 @@ interface EventFiltersProps {
   availableMethods: string[];
 }
 
-export const EventFiltersComponent = ({
+const EventFiltersComponent = ({
   filters,
   onFiltersChange,
   availableProviders,
@@ -181,3 +181,5 @@ export const EventFiltersComponent = ({
     </div>
   );
 };
+
+export default EventFiltersComponent;

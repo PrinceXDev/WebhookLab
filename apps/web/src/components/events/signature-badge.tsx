@@ -89,10 +89,7 @@ const getStatusConfig = (status: string): StatusConfig => {
   }
 };
 
-export const SignatureBadge = ({
-  verification,
-  className,
-}: SignatureBadgeProps) => {
+const SignatureBadge = ({ verification, className }: SignatureBadgeProps) => {
   if (!verification || verification.status === "not_applicable") {
     return null;
   }
@@ -159,3 +156,5 @@ export const SignatureStatusIndicator = ({
     </div>
   );
 };
+
+export default SignatureBadge;

@@ -8,6 +8,11 @@ import { toast } from "@/components/ui/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import {
+  ANALYSIS_STEPS,
+  COPY_FEEDBACK_DURATION,
+  getConfidenceVariant,
+} from "@/constants";
+import {
   Check,
   Copy,
   Loader2,
@@ -18,32 +23,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-const STEPS = [
-  { key: "provider", label: "Provider" },
-  { key: "event", label: "Event type" },
-  { key: "meaning", label: "What it means" },
-  { key: "handler", label: "Handler code" },
-] as const;
-
-const confidenceVariant = (
-  c: AiPayloadAnalysis["providerConfidence"],
-): "default" | "secondary" | "outline" => {
-  if (c === "high") {
-    return "default";
-  }
-  if (c === "medium") {
-    return "secondary";
-  }
-  return "outline";
-};
-
 type PayloadAnalysisPanelProps = {
   endpointSlug: string;
   eventId: string;
   analysis?: AiPayloadAnalysis;
 };
 
-export const PayloadAnalysisPanel = ({
+const PayloadAnalysisPanel = ({
   endpointSlug,
   eventId,
   analysis,
@@ -51,13 +37,12 @@ export const PayloadAnalysisPanel = ({
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
 
-  const mutation = useMutation({
-    mutationFn: (regenerate: boolean) => {
-      return apiClient.post<{ id: string; aiAnalysis?: AiPayloadAnalysis }>(
+  const { mutate, isPending } = useMutation({
+    mutationFn: (regenerate: boolean) =>
+      apiClient.post<{ id: string; aiAnalysis?: AiPayloadAnalysis }>(
         `/api/endpoints/${endpointSlug}/events/${eventId}/analyze`,
         { regenerate },
-      );
-    },
+      ),
     onSuccess: (_, regenerate) => {
       queryClient.invalidateQueries({ queryKey: ["events", endpointSlug] });
       toast({
@@ -74,17 +59,15 @@ export const PayloadAnalysisPanel = ({
     },
   });
 
-  const run = (regenerate: boolean) => mutation.mutate(regenerate);
-
-  const { isPending: pending } = mutation;
-
   const copyCode = async () => {
-    if (!analysis?.suggestedHandler.code) {
+    const code = analysis?.suggestedHandler.code;
+    if (!code) {
       return;
     }
-    await navigator.clipboard.writeText(analysis.suggestedHandler.code);
+
+    await navigator.clipboard.writeText(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), COPY_FEEDBACK_DURATION);
   };
 
   return (
@@ -100,10 +83,10 @@ export const PayloadAnalysisPanel = ({
               type="button"
               variant="outline"
               size="sm"
-              disabled={pending}
-              onClick={() => run(true)}
+              disabled={isPending}
+              onClick={() => mutate(true)}
             >
-              {pending ? (
+              {isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -114,10 +97,10 @@ export const PayloadAnalysisPanel = ({
             <Button
               type="button"
               size="sm"
-              disabled={pending}
-              onClick={() => run(false)}
+              disabled={isPending}
+              onClick={() => mutate(false)}
             >
-              {pending ? (
+              {isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Sparkles className="h-3.5 w-3.5" />
@@ -132,16 +115,16 @@ export const PayloadAnalysisPanel = ({
         className="grid grid-cols-2 gap-2 sm:grid-cols-4"
         aria-label="Analysis flow"
       >
-        {STEPS.map((step, i) => {
-          const done = Boolean(analysis) && !pending;
+        {ANALYSIS_STEPS.map((step, i) => {
+          const done = Boolean(analysis) && !isPending;
           return (
             <li
               key={step.key}
               className={cn(
                 "flex items-center gap-2 rounded-md border px-2 py-2 text-xs",
                 done && "border-primary/40 bg-primary/5",
-                pending && i === 0 && "animate-pulse border-dashed",
-                !done && !pending && "opacity-60",
+                isPending && i === 0 && "animate-pulse border-dashed",
+                !done && !isPending && "opacity-60",
               )}
             >
               <span
@@ -158,7 +141,7 @@ export const PayloadAnalysisPanel = ({
         })}
       </ol>
 
-      {pending && (
+      {isPending && (
         <div className="flex flex-col items-center justify-center py-8 space-y-4">
           <div className="relative">
             <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
@@ -181,7 +164,7 @@ export const PayloadAnalysisPanel = ({
               Detected provider
             </span>
             <Badge variant="secondary">{analysis.providerGuess}</Badge>
-            <Badge variant={confidenceVariant(analysis.providerConfidence)}>
+            <Badge variant={getConfidenceVariant(analysis.providerConfidence)}>
               {analysis.providerConfidence} confidence
             </Badge>
           </div>
@@ -206,55 +189,58 @@ export const PayloadAnalysisPanel = ({
           </div>
 
           {analysis.anomalyDetection &&
-            analysis.anomalyDetection.level !== "none" && (
-              <div
-                className={cn(
-                  "rounded-lg border p-3",
-                  analysis.anomalyDetection.level === "high" &&
-                    "border-red-500 bg-red-50 dark:bg-red-950",
-                  analysis.anomalyDetection.level === "medium" &&
+            analysis.anomalyDetection.level !== "none" &&
+            (() => {
+              const { level, score, explanation, flags } =
+                analysis.anomalyDetection;
+              const levelStyles = {
+                high: {
+                  container: "border-red-500 bg-red-50 dark:bg-red-950",
+                  icon: "text-red-600",
+                },
+                medium: {
+                  container:
                     "border-orange-500 bg-orange-50 dark:bg-orange-950",
-                  analysis.anomalyDetection.level === "low" &&
+                  icon: "text-orange-600",
+                },
+                low: {
+                  container:
                     "border-yellow-500 bg-yellow-50 dark:bg-yellow-950",
-                )}
-              >
-                <div className="flex items-start gap-2">
-                  <AlertTriangle
-                    className={cn(
-                      "h-4 w-4 mt-0.5",
-                      analysis.anomalyDetection.level === "high" &&
-                        "text-red-600",
-                      analysis.anomalyDetection.level === "medium" &&
-                        "text-orange-600",
-                      analysis.anomalyDetection.level === "low" &&
-                        "text-yellow-600",
-                    )}
-                  />
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide mb-1">
-                      Anomaly Detected (Score: {analysis.anomalyDetection.score}
-                      /100)
-                    </p>
-                    <p className="text-sm mb-2">
-                      {analysis.anomalyDetection.explanation}
-                    </p>
-                    {analysis.anomalyDetection.flags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {analysis.anomalyDetection.flags.map((flag) => (
-                          <Badge
-                            key={flag}
-                            variant="outline"
-                            className="text-xs"
-                          >
-                            {flag.replaceAll("_", " ")}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                  icon: "text-yellow-600",
+                },
+              }[level];
+
+              return (
+                <div
+                  className={cn("rounded-lg border p-3", levelStyles.container)}
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle
+                      className={cn("h-4 w-4 mt-0.5", levelStyles.icon)}
+                    />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide mb-1">
+                        Anomaly Detected (Score: {score}/100)
+                      </p>
+                      <p className="text-sm mb-2">{explanation}</p>
+                      {flags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {flags.map((flag) => (
+                            <Badge
+                              key={flag}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {flag.replaceAll("_", " ")}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
           {analysis.businessIntent && (
             <div className="rounded-lg border border-blue-500 bg-blue-50 dark:bg-blue-950 p-3">
@@ -279,8 +265,8 @@ export const PayloadAnalysisPanel = ({
                   Suggested Actions
                 </p>
                 <ul className="space-y-1">
-                  {analysis.suggestedActions.map((action, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm">
+                  {analysis.suggestedActions.map((action) => (
+                    <li key={action} className="flex items-start gap-2 text-sm">
                       <span className="text-primary mt-1">•</span>
                       <span>{action}</span>
                     </li>
@@ -289,39 +275,51 @@ export const PayloadAnalysisPanel = ({
               </div>
             )}
 
-          {analysis.changeDetection && analysis.changeDetection.hasChanges && (
-            <div className="rounded-lg border border-purple-500 bg-purple-50 dark:bg-purple-950 p-3">
-              <p className="text-xs font-semibold text-purple-900 dark:text-purple-100 uppercase tracking-wide mb-2">
-                Changes from Previous Event
-              </p>
-              <p className="text-sm text-purple-900 dark:text-purple-100 mb-2">
-                {analysis.changeDetection.summary}
-              </p>
-              {analysis.changeDetection.changes.length > 0 && (
-                <div className="space-y-1">
-                  {analysis.changeDetection.changes.map((change, index) => (
-                    <div
-                      key={index}
-                      className="text-xs font-mono bg-white/50 dark:bg-black/50 rounded px-2 py-1"
-                    >
-                      <Badge variant="outline" className="mr-2">
-                        {change.changeType}
-                      </Badge>
-                      <span className="font-semibold">{change.field}</span>
-                      {change.previousValue && (
-                        <span className="text-muted-foreground">
-                          {" "}
-                          from {change.previousValue}
-                        </span>
+          {analysis.changeDetection &&
+            analysis.changeDetection.hasChanges &&
+            (() => {
+              const { summary, changes } = analysis.changeDetection;
+              return (
+                <div className="rounded-lg border border-purple-500 bg-purple-50 dark:bg-purple-950 p-3">
+                  <p className="text-xs font-semibold text-purple-900 dark:text-purple-100 uppercase tracking-wide mb-2">
+                    Changes from Previous Event
+                  </p>
+                  <p className="text-sm text-purple-900 dark:text-purple-100 mb-2">
+                    {summary}
+                  </p>
+                  {changes.length > 0 && (
+                    <div className="space-y-1">
+                      {changes.map(
+                        ({
+                          changeType,
+                          field,
+                          previousValue,
+                          currentValue,
+                        }) => (
+                          <div
+                            key={`${field}-${changeType}`}
+                            className="text-xs font-mono bg-white/50 dark:bg-black/50 rounded px-2 py-1"
+                          >
+                            <Badge variant="outline" className="mr-2">
+                              {changeType}
+                            </Badge>
+                            <span className="font-semibold">{field}</span>
+                            {previousValue && (
+                              <span className="text-muted-foreground">
+                                {" "}
+                                from {previousValue}
+                              </span>
+                            )}
+                            <span className="text-muted-foreground"> to </span>
+                            <span>{currentValue}</span>
+                          </div>
+                        ),
                       )}
-                      <span className="text-muted-foreground"> to </span>
-                      <span>{change.currentValue}</span>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+              );
+            })()}
 
           {analysis.keyFields && analysis.keyFields.length > 0 && (
             <div>
@@ -329,15 +327,15 @@ export const PayloadAnalysisPanel = ({
                 Notable fields
               </p>
               <dl className="grid gap-1 text-xs sm:grid-cols-2">
-                {analysis.keyFields.map((f) => (
+                {analysis.keyFields.map(({ name, value }) => (
                   <div
-                    key={f.name}
+                    key={name}
                     className="flex gap-2 rounded bg-muted/50 px-2 py-1"
                   >
                     <dt className="font-mono text-muted-foreground shrink-0">
-                      {f.name}
+                      {name}
                     </dt>
-                    <dd className="truncate font-mono">{f.value}</dd>
+                    <dd className="truncate font-mono">{value}</dd>
                   </div>
                 ))}
               </dl>
@@ -364,11 +362,11 @@ export const PayloadAnalysisPanel = ({
                 <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
               </Button>
             </div>
-            {analysis.suggestedHandler.notes ? (
+            {analysis.suggestedHandler.notes && (
               <p className="text-xs text-muted-foreground mb-2">
                 {analysis.suggestedHandler.notes}
               </p>
-            ) : null}
+            )}
             <pre className="text-xs bg-slate-100 dark:bg-slate-900 p-3 rounded overflow-x-auto max-h-72 overflow-y-auto whitespace-pre-wrap">
               {analysis.suggestedHandler.code}
             </pre>
@@ -383,3 +381,5 @@ export const PayloadAnalysisPanel = ({
     </div>
   );
 };
+
+export default PayloadAnalysisPanel;

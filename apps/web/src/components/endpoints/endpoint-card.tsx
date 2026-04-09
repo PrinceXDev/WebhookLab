@@ -10,10 +10,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copy } from "lucide-react";
 import type { EndpointRecord } from "@/types/endpoint";
-import { EndpointActions } from "./endpoint-actions";
+import {
+  ENDPOINT_STATUS,
+  getWebhookUrl,
+  NO_DESCRIPTION_TEXT,
+} from "@/constants";
+import EndpointActions from "./endpoint-actions";
 
-export const EndpointCard = ({ endpoint }: { endpoint: EndpointRecord }) => {
-  const webhookUrl = `${process.env.NEXT_PUBLIC_API_URL}/hook/${endpoint.slug}`;
+type EndpointCardProps = {
+  endpoint: EndpointRecord;
+};
+
+const EndpointCard = ({ endpoint }: EndpointCardProps) => {
+  const { slug, name, description, isActive, createdAt } = endpoint;
+  const webhookUrl = getWebhookUrl(slug);
 
   const copyToClipboard = () => {
     void navigator.clipboard.writeText(webhookUrl);
@@ -25,20 +35,18 @@ export const EndpointCard = ({ endpoint }: { endpoint: EndpointRecord }) => {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1 space-y-1.5">
             <Link
-              href={`/dashboard/endpoints/${endpoint.slug}`}
+              href={`/dashboard/endpoints/${slug}`}
               className="block outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
-              <CardTitle className="text-xl hover:underline">
-                {endpoint.name}
-              </CardTitle>
+              <CardTitle className="text-xl hover:underline">{name}</CardTitle>
             </Link>
             <CardDescription className="line-clamp-2">
-              {endpoint.description || "No description"}
+              {description || NO_DESCRIPTION_TEXT}
             </CardDescription>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Badge variant={endpoint.isActive ? "default" : "secondary"}>
-              {endpoint.isActive ? "Active" : "Inactive"}
+            <Badge variant={isActive ? "default" : "secondary"}>
+              {isActive ? ENDPOINT_STATUS.ACTIVE : ENDPOINT_STATUS.INACTIVE}
             </Badge>
             <EndpointActions endpoint={endpoint} />
           </div>
@@ -60,9 +68,11 @@ export const EndpointCard = ({ endpoint }: { endpoint: EndpointRecord }) => {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Created {new Date(endpoint.createdAt).toLocaleDateString()}
+          Created {new Date(createdAt).toLocaleDateString()}
         </p>
       </CardContent>
     </Card>
   );
 };
+
+export default EndpointCard;

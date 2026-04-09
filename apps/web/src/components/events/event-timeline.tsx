@@ -39,10 +39,7 @@ const getLatencyColor = (latencyMs: number): string => {
   return "text-red-600 bg-red-50 dark:bg-red-950";
 };
 
-export const EventTimeline = ({
-  timeline,
-  totalDurationMs,
-}: EventTimelineProps) => {
+const EventTimeline = ({ timeline, totalDurationMs }: EventTimelineProps) => {
   if (!timeline || timeline.length === 0) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -132,3 +129,5 @@ export const EventTimeline = ({
     </div>
   );
 };
+
+export default EventTimeline;

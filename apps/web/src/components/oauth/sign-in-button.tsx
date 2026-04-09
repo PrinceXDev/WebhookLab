@@ -3,12 +3,14 @@
 import { signIn } from "next-auth/react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 
-export const SignInButton = ({
+type SignInButtonProps = ButtonProps;
+
+const SignInButton = ({
   onClick,
   type = "button",
   "aria-label": ariaLabel,
   ...props
-}: ButtonProps) => (
+}: SignInButtonProps) => (
   <Button
     {...props}
     type={type}
@@ -21,3 +23,5 @@ export const SignInButton = ({
     }}
   />
 );
+
+export default SignInButton;

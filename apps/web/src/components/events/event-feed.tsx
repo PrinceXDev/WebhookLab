@@ -4,8 +4,8 @@ import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { WebhookEvent } from "@webhooklab/shared";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { EventCard } from "./event-card";
-import { EventFiltersComponent, type EventFilters } from "./event-filters";
+import EventFiltersComponent, { type EventFilters } from "./event-filters";
+import EventCard from "./event-card";
 
 const EventFeed = ({ endpointSlug }: { endpointSlug: string }) => {
   const queryClient = useQueryClient();

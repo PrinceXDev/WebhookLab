@@ -7,13 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { SignatureBadge } from "./signature-badge";
 import { LatencyBar, shouldShowLatencyBar } from "./latency-bar";
 import { EventDetailsTabs } from "./event-details-tabs";
-import { TimelineViewToggle } from "./timeline-view-toggle";
 import { cn } from "@/lib/utils";
+import TimelineViewToggle from "./timeline-view-toggle";
+import SignatureBadge from "./signature-badge";
 
-export const EventCard = ({
+const EventCard = ({
   event,
   endpointSlug,
 }: {
@@ -21,6 +21,14 @@ export const EventCard = ({
   endpointSlug: string;
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const {
+    timeline = [],
+    totalDurationMs,
+    signatureVerification,
+    method = "",
+    id = "",
+    timestamp,
+  } = event || {};
 
   const getMethodColor = (method: string) => {
     const colors: Record<string, string> = {
@@ -34,13 +42,13 @@ export const EventCard = ({
   };
 
   const getStatusBadge = () => {
-    if (!event.timeline || event.timeline.length === 0) {
+    if (!timeline?.length) {
       return null;
     }
 
-    const hasError = event.timeline.some((stage) => stage.status === "error");
-    const allDone = event.timeline.every(
-      (stage) => stage.status === "done" || stage.status === "error",
+    const hasError = timeline.some(({ status }) => status === "error");
+    const allDone = timeline.every(({ status }) =>
+      ["done", "error"].includes(status),
     );
 
     if (hasError) {
@@ -71,24 +79,22 @@ export const EventCard = ({
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 flex-wrap">
-            <Badge className={getMethodColor(event.method)}>
-              {event.method}
-            </Badge>
+            <Badge className={getMethodColor(method)}>{method}</Badge>
             {getStatusBadge()}
-            <SignatureBadge verification={event.signatureVerification} />
+            <SignatureBadge verification={signatureVerification} />
 
-            {event.totalDurationMs !== undefined && (
+            {totalDurationMs !== undefined && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                <span>{event.totalDurationMs}ms</span>
+                <span>{totalDurationMs}ms</span>
               </div>
             )}
 
             <span className="text-sm font-mono text-muted-foreground">
-              {event.id}
+              {id}
             </span>
             <span className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(event.timestamp), {
+              {formatDistanceToNow(new Date(timestamp), {
                 addSuffix: true,
               })}
             </span>
@@ -108,20 +114,20 @@ export const EventCard = ({
 
         {expanded && (
           <div className="mt-6 space-y-6">
-            {event.timeline && event.timeline.length > 0 && (
+            {timeline && timeline.length > 0 && (
               <div className="rounded-lg border bg-card p-4">
                 <TimelineViewToggle
-                  timeline={event.timeline}
-                  totalDurationMs={event.totalDurationMs}
+                  timeline={timeline}
+                  totalDurationMs={totalDurationMs}
                 />
               </div>
             )}
 
-            {shouldShowLatencyBar(event.timeline, event.totalDurationMs) && (
+            {shouldShowLatencyBar(timeline, totalDurationMs) && (
               <div className="rounded-lg border bg-card p-4">
                 <LatencyBar
-                  timeline={event.timeline}
-                  totalDurationMs={event.totalDurationMs}
+                  timeline={timeline}
+                  totalDurationMs={totalDurationMs}
                 />
               </div>
             )}
@@ -139,3 +145,5 @@ export const EventCard = ({
     </Card>
   );
 };
+
+export default EventCard;

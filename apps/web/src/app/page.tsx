@@ -3,7 +3,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { SignInButton } from "@/components/auth/sign-in-button";
+import SignInButton from "@/components/oauth/sign-in-button";
 import { GithubMarkIcon } from "@/components/icons/github-mark";
 
 const HomePage = async () => {

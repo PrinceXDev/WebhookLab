@@ -1,6 +1,6 @@
 "use client";
 
-import { EndpointCard } from "./endpoint-card";
+import EndpointCard from "./endpoint-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { apiClient } from "@/lib/api-client";

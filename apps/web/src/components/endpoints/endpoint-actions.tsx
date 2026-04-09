@@ -22,7 +22,7 @@ import { apiClient } from "@/lib/api-client";
 import type { EndpointRecord } from "@/types/endpoint";
 import { EndpointFormDialog } from "./endpoint-form-dialog";
 
-export const EndpointActions = ({
+const EndpointActions = ({
   endpoint,
   onDeleted,
 }: {
@@ -130,3 +130,5 @@ export const EndpointActions = ({
     </>
   );
 };
+
+export default EndpointActions;

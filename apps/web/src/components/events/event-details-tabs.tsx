@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RotateCw } from "lucide-react";
-import { PayloadAnalysisPanel } from "./payload-analysis-panel";
+import PayloadAnalysisPanel from "./payload-analysis-panel";
 import type { AiPayloadAnalysis } from "@webhooklab/shared";
 import { useToast } from "@/components/ui/use-toast";
 

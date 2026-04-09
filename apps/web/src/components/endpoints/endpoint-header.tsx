@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { apiClient } from "@/lib/api-client";
 import type { EndpointRecord } from "@/types/endpoint";
-import { EndpointActions } from "./endpoint-actions";
+import EndpointActions from "./endpoint-actions";
 
 const EndpointHeader = ({ slug }: { slug: string }) => {
   const router = useRouter();

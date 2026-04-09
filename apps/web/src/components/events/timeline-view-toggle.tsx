@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { BarChart3, GitBranch } from "lucide-react";
 import type { TimelineStage } from "@/constants/timeline";
-import { EventTimeline } from "./event-timeline";
 import { GoogleTimelineChart } from "./google-timeline-chart";
+import EventTimeline from "./event-timeline";
 
 interface TimelineViewToggleProps {
   readonly timeline?: TimelineStage[];
@@ -14,7 +14,7 @@ interface TimelineViewToggleProps {
 
 type ViewMode = "google" | "vertical";
 
-export const TimelineViewToggle = ({
+const TimelineViewToggle = ({
   timeline,
   totalDurationMs,
 }: TimelineViewToggleProps) => {
@@ -59,3 +59,5 @@ export const TimelineViewToggle = ({
     </div>
   );
 };
+
+export default TimelineViewToggle;
