@@ -57,6 +57,8 @@ export const authOptions: NextAuthOptions = {
     GithubProvider({
       clientId: getEnvVariable("GITHUB_CLIENT_ID"),
       clientSecret: getEnvVariable("GITHUB_CLIENT_SECRET"),
+      // NextAuth v4 + GitHub's new OAuth flow with `iss` parameter
+      issuer: "https://github.com/login/oauth",
       profile: ({ id, githubId, name, email, avatar_url }) => {
         return {
           id,
