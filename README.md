@@ -123,9 +123,7 @@ WebhookLab/
 │       │   ├── routes/         # API routes
 │       │   ├── redis/          # Redis client & event store
 │       │   ├── websocket/      # Socket.IO setup
-│       │   └── lib/            # Prisma client
-│       ├── prisma/
-│       │   └── schema.prisma   # Database schema
+│       │   └── lib/
 │       └── package.json
 │
 ├── packages/
@@ -302,22 +300,11 @@ pnpm docker:up
 2. Check `NEXT_PUBLIC_WS_URL` in `apps/web/.env.local`
 3. Check browser console for connection errors
 
-### Prisma errors
-
-```bash
-# Regenerate Prisma client
-cd apps/server
-pnpm prisma generate
-
-# Reset database
-pnpm prisma db push --force-reset
-```
-
 ## Next Steps
 
 1. **Fill in your environment variables** in `apps/web/.env.local`
 2. **Run `pnpm install`** to install all dependencies
 3. **Start Docker** with `pnpm docker:up`
-4. **Push database schema** with `pnpm db:push`
+4. **Initialize the database** with `pnpm db:init`
 5. **Start dev servers** with `pnpm dev`
 6. **Test it** by creating an endpoint and sending a webhook

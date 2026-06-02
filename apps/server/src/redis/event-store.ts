@@ -97,11 +97,6 @@ export const getEventById = async (
   return event ? JSON.parse(event) : null;
 };
 
-export const getEventCount = async (endpointSlug: string): Promise<number> => {
-  const key = `webhook:${endpointSlug}:events`;
-  return await redisClient.zCard(key);
-};
-
 /** Replace a stored event member (same id + timestamp) after e.g. attaching AI analysis. */
 export const replaceWebhookEvent = async (
   endpointSlug: string,

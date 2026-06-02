@@ -36,15 +36,6 @@ const getProviderIcon = (provider: string): string => {
   return icons[provider.toLowerCase()] ?? "🔗";
 };
 
-const getProviderDisplayName = (provider: string): string => {
-  const names: Record<string, string> = {
-    stripe: "Stripe",
-    github: "GitHub",
-    shopify: "Shopify",
-  };
-  return names[provider.toLowerCase()] ?? provider;
-};
-
 const getStatusConfig = (status: string): StatusConfig => {
   switch (status) {
     case "verified":
@@ -116,44 +107,6 @@ const SignatureBadge = ({ verification, className }: SignatureBadgeProps) => {
         <span className="text-[10px] opacity-75">({algorithm})</span>
       )}
     </Badge>
-  );
-};
-
-export const SignatureStatusIndicator = ({
-  verification,
-}: SignatureBadgeProps) => {
-  if (!verification || verification.status === "not_applicable") {
-    return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Shield className="h-4 w-4" />
-        <span>No signature verification</span>
-      </div>
-    );
-  }
-
-  const { status, provider, message } = verification;
-  const { icon: Icon } = getStatusConfig(status);
-
-  return (
-    <div className="flex items-center gap-2">
-      <Icon
-        className={cn(
-          "h-4 w-4",
-          status === "verified" && "text-green-600",
-          status === "failed" && "text-red-600",
-          status === "missing_signature" && "text-yellow-600",
-          status === "missing_secret" && "text-gray-500",
-        )}
-      />
-      <div className="flex flex-col">
-        <span className="text-sm font-medium">
-          {getProviderDisplayName(provider)} Signature
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {message ?? status}
-        </span>
-      </div>
-    </div>
   );
 };
 

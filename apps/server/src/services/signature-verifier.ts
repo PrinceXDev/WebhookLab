@@ -64,9 +64,7 @@ export function verifyWebhookSignature(
 /**
  * Detect webhook provider from headers
  */
-export function detectProvider(
-  headers: Record<string, string>,
-): WebhookProvider {
+function detectProvider(headers: Record<string, string>): WebhookProvider {
   const lowerHeaders = Object.fromEntries(
     Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]),
   );
@@ -331,36 +329,4 @@ function verifyShopifySignature(
   }
 }
 
-/**
- * Get provider-specific signature header name
- */
-export function getSignatureHeaderName(
-  provider: WebhookProvider,
-): string | null {
-  switch (provider) {
-    case "stripe":
-      return "stripe-signature";
-    case "github":
-      return "x-hub-signature-256";
-    case "shopify":
-      return "x-shopify-hmac-sha256";
-    default:
-      return null;
-  }
-}
-
-/**
- * Get provider display name
- */
-export function getProviderDisplayName(provider: WebhookProvider): string {
-  switch (provider) {
-    case "stripe":
-      return "Stripe";
-    case "github":
-      return "GitHub";
-    case "shopify":
-      return "Shopify";
-    default:
-      return "Unknown";
-  }
-}
+// (intentionally no exported provider helpers; server only verifies signatures)
