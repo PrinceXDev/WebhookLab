@@ -15,7 +15,6 @@ FROM deps AS builder
 WORKDIR /app
 COPY packages/shared/ ./packages/shared/
 COPY apps/server/ ./apps/server/
-RUN pnpm --filter @webhooklab/shared build 2>/dev/null || true
 RUN cd apps/server && npx prisma generate
 RUN pnpm --filter server build
 
@@ -26,9 +25,10 @@ COPY package.json pnpm-workspace.yaml turbo.json pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/server/package.json ./apps/server/
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY packages/shared/src ./packages/shared/src
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY apps/server/prisma ./apps/server/prisma
+COPY --from=builder /app/apps/server/node_modules/.prisma ./apps/server/node_modules/.prisma
 
 WORKDIR /app/apps/server
 EXPOSE 4000
