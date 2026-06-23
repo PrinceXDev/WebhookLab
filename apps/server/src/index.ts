@@ -14,33 +14,35 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-// update the port while everything is running smooth
+
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+  : [];
+
+const corsOriginHandler = (
+  origin: string | undefined,
+  callback: (err: Error | null, allow?: boolean) => void,
+) => {
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+
+  const isLocalhost = origin.startsWith("http://localhost:");
+  const isAllowed = allowedOrigins.some((o) => o === origin);
+
+  if (isLocalhost || isAllowed) {
+    callback(null, true);
+  } else {
+    callback(new Error("Not allowed by CORS"));
+  }
+};
 
 const io = new Server(httpServer, {
-  cors: {
-    origin: (origin, callback) => {
-      if (!origin || origin.startsWith("http://localhost:")) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  },
+  cors: { origin: corsOriginHandler, credentials: true },
 });
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || origin.startsWith("http://localhost:")) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  }),
-);
+app.use(cors({ origin: corsOriginHandler, credentials: true }));
 
 // Morgan HTTP request logging
 app.use(
