@@ -1,0 +1,53 @@
+# Render Blueprint for WebhookLab server
+# Docs: https://render.com/docs/blueprint-spec
+#
+# DB note: this project uses an EXTERNAL Postgres (Supabase), so no Render
+# Postgres is provisioned here. Set DATABASE_URL / DIRECT_URL in the dashboard.
+# Render Key Value (Redis) IS provisioned below since the server requires it.
+
+services:
+  - type: web
+    name: webhooklab-server
+    runtime: docker
+    dockerfilePath: ./apps/server/Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore # match your Supabase region (ap-southeast-1) to cut latency
+    healthCheckPath: /health
+    # Applies any pending migrations to the live DB before the new version goes
+    # live. Idempotent: if there's nothing new, it's a no-op. Uses DIRECT_URL
+    # (non-pooled) under the hood, which is required for Prisma Migrate.
+    preDeployCommand: cd apps/server && pnpm exec prisma migrate deploy
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # PORT is injected by Render automatically — do NOT set it.
+      - key: REDIS_URL
+        fromService:
+          name: webhooklab-redis
+          type: keyvalue
+          property: connectionString
+      # ---- Secrets: set these in the Render dashboard (sync: false) ----
+      - key: DATABASE_URL # Supabase POOLED URL (pgbouncer :6543, ...?pgbouncer=true)
+        sync: false
+      - key: DIRECT_URL # Supabase DIRECT URL (:5432) — required by `migrate deploy`
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: CORS_ORIGIN # your frontend origin, e.g. https://app.example.com
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+
+  - type: keyvalue
+    name: webhooklab-redis
+    plan: free
+    region: singapore
+    maxmemoryPolicy: noeviction # webhook event/endpoint data must not be evicted
+    ipAllowList: [] # only reachable from within Render's network

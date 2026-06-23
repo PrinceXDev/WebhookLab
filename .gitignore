@@ -51,7 +51,8 @@ Thumbs.db
 *~
 
 # Prisma
-apps/server/prisma/migrations
+# NOTE: prisma/migrations MUST be committed so `prisma migrate deploy` can
+# replay them in CI/production. Do not ignore it.
 
 # Docker
 docker-compose.override.yml
