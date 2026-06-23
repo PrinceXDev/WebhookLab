@@ -16,6 +16,9 @@ WORKDIR /app
 COPY packages/shared/ ./packages/shared/
 COPY apps/server/ ./apps/server/
 RUN pnpm --filter @webhooklab/server exec prisma generate
+# Build shared (emits dist/*.js) BEFORE the server, since the server's compiled
+# output imports @webhooklab/shared at runtime — it must resolve to JS, not .ts.
+RUN pnpm --filter @webhooklab/shared build
 RUN pnpm --filter @webhooklab/server build
 
 # ---- runtime ----
@@ -31,7 +34,7 @@ COPY apps/server/package.json ./apps/server/
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
 COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY packages/shared/src ./packages/shared/src
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY apps/server/prisma ./apps/server/prisma
 

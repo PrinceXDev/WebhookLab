@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { aiPayloadAnalysisCoreSchema } from "./payload-analysis";
+import { aiPayloadAnalysisCoreSchema } from "./payload-analysis.js";
 
 export const timelineStageSchema = z.object({
   name: z.enum(["received", "verified", "parsed", "forwarded", "responded"]),
