@@ -7,6 +7,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml turbo.json pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/server/package.json ./apps/server/
+ENV HUSKY=0
 RUN pnpm install --frozen-lockfile
 
 # ---- build ----
@@ -24,6 +25,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml turbo.json pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/server/package.json ./apps/server/
+ENV HUSKY=0
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
