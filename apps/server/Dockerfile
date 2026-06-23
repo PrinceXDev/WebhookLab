@@ -16,6 +16,7 @@ WORKDIR /app
 COPY packages/shared/ ./packages/shared/
 COPY apps/server/ ./apps/server/
 RUN pnpm --filter @webhooklab/shared build 2>/dev/null || true
+RUN cd apps/server && npx prisma generate
 RUN pnpm --filter server build
 
 # ---- runtime ----
