@@ -4,7 +4,7 @@ RUN npm install -g pnpm
 # ---- deps ----
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml turbo.json ./
+COPY package.json pnpm-workspace.yaml turbo.json pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/server/package.json ./apps/server/
 RUN pnpm install --frozen-lockfile
@@ -21,7 +21,7 @@ RUN pnpm --filter server build
 FROM node:20-alpine AS runner
 RUN npm install -g pnpm
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml turbo.json ./
+COPY package.json pnpm-workspace.yaml turbo.json pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/server/package.json ./apps/server/
 RUN pnpm install --frozen-lockfile --prod
