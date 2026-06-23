@@ -28,7 +28,7 @@ RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 COPY packages/shared/src ./packages/shared/src
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY apps/server/prisma ./apps/server/prisma
-COPY --from=builder /app/apps/server/node_modules/.prisma ./apps/server/node_modules/.prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 WORKDIR /app/apps/server
 EXPOSE 4000
