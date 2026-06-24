@@ -18,7 +18,11 @@ export function initializeWebSocket(io: Server) {
   });
 
   redisSubClient.on("error", (err) =>
-    logger.error("Redis Sub Client Error", { error: err }),
+    logger.error("Redis Sub Client Error", {
+      message: err?.message,
+      code: (err as NodeJS.ErrnoException)?.code,
+      stack: err?.stack,
+    }),
   );
 
   redisSubClient.connect().then(() => {

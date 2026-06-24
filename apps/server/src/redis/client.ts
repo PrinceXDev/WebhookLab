@@ -25,10 +25,18 @@ export const redisClient = createClient(clientConfig);
 
 export const redisPubClient = createClient(clientConfig);
 
-redisClient.on("error", (err) => 
-  logger.error("Redis Client Error", { error: err })
+redisClient.on("error", (err) =>
+  logger.error("Redis Client Error", {
+    message: err?.message,
+    code: (err as NodeJS.ErrnoException)?.code,
+    stack: err?.stack,
+  })
 );
 
 redisPubClient.on("error", (err) =>
-  logger.error("Redis Pub Client Error", { error: err })
+  logger.error("Redis Pub Client Error", {
+    message: err?.message,
+    code: (err as NodeJS.ErrnoException)?.code,
+    stack: err?.stack,
+  })
 );
