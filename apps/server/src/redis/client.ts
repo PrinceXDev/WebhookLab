@@ -14,13 +14,16 @@ if (!/^rediss?:\/\//.test(REDIS_URL)) {
   );
 }
 
-export const redisClient = createClient({
+const clientConfig = {
   url: REDIS_URL,
-});
+  socket: REDIS_URL.startsWith("rediss://")
+    ? { tls: true, rejectUnauthorized: false }
+    : undefined,
+};
 
-export const redisPubClient = createClient({
-  url: REDIS_URL,
-});
+export const redisClient = createClient(clientConfig);
+
+export const redisPubClient = createClient(clientConfig);
 
 redisClient.on("error", (err) => 
   logger.error("Redis Client Error", { error: err })

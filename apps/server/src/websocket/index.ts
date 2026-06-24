@@ -10,7 +10,12 @@ const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const redisChannelsWithListener = new Set<string>();
 
 export function initializeWebSocket(io: Server) {
-  const redisSubClient = createClient({ url: REDIS_URL });
+  const redisSubClient = createClient({
+    url: REDIS_URL,
+    socket: REDIS_URL.startsWith("rediss://")
+      ? { tls: true, rejectUnauthorized: false }
+      : undefined,
+  });
 
   redisSubClient.on("error", (err) =>
     logger.error("Redis Sub Client Error", { error: err }),
