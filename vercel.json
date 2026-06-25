@@ -1,6 +1,6 @@
 {
-  "buildCommand": "next build",
-  "outputDirectory": ".next",
-  "installCommand": "pnpm install --filter @webhooklab/web... ",
+  "buildCommand": "pnpm --filter @webhooklab/shared build && pnpm --filter @webhooklab/web build",
+  "outputDirectory": "apps/web/.next",
+  "installCommand": "pnpm install",
   "framework": "nextjs"
 }
