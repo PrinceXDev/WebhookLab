@@ -1,6 +1,38 @@
-const fetchWithAuth = (url: string, options: RequestInit = {}) => {
+/**
+ * Fetches the raw NextAuth JWT from our own Next.js route. The session cookie
+ * is scoped to the frontend domain and is not sent to the cross-domain backend,
+ * so we forward the token explicitly as a Bearer header instead.
+ */
+const getBearerToken = async (): Promise<string | null> => {
+  try {
+    const res = await fetch("/api/token", { credentials: "include" });
+    if (!res.ok) {
+      return null;
+    }
+    const body: unknown = await res.json();
+    if (
+      body !== null &&
+      typeof body === "object" &&
+      "token" in body &&
+      typeof (body as { token: unknown }).token === "string"
+    ) {
+      return (body as { token: string }).token;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+  const token = await getBearerToken();
+  const headers = new Headers(options.headers);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
   return fetch(url, {
     ...options,
+    headers,
     credentials: "include",
   });
 };
