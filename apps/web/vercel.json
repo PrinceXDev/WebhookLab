@@ -2,5 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "cd ../.. && pnpm --filter @webhooklab/shared build && pnpm --filter @webhooklab/web build"
+  "buildCommand": "cd ../.. && pnpm --filter @webhooklab/shared build && pnpm --filter @webhooklab/web exec prisma generate && pnpm --filter @webhooklab/web build"
 }
