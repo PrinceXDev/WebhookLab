@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter @webhooklab/shared build && pnpm --filter @webhooklab/web build",
+  "buildCommand": "turbo run build --filter=@webhooklab/web",
   "outputDirectory": "apps/web/.next",
   "installCommand": "pnpm install",
   "framework": "nextjs"
