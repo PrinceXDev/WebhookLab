@@ -4,6 +4,15 @@
 
 A real-time webhook inspector and replay engine with AI-powered payload analysis. Built with Next.js, Express, Redis, WebSocket, and Claude AI.
 
+**🚀 Live demo:** [webhook-lab-web.vercel.app](https://webhook-lab-web.vercel.app)
+
+| Service       | Hosted on                          | URL                                       |
+| ------------- | ---------------------------------- | ----------------------------------------- |
+| **Frontend**  | Vercel                             | `https://webhook-lab-web.vercel.app`      |
+| **Backend**   | Render (Docker web service)        | `https://webhooklab.onrender.com`         |
+| **Database**  | Supabase (managed PostgreSQL)      | —                                         |
+| **Redis**     | Render Key Value store             | —                                         |
+
 ## Features
 
 - **GitHub OAuth Authentication**: Secure sign-in with NextAuth.js
@@ -24,12 +33,12 @@ A real-time webhook inspector and replay engine with AI-powered payload analysis
 | **Frontend**       | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui |
 | **Backend**        | Express.js, Socket.IO, TypeScript                                      |
 | **Auth**           | NextAuth.js with GitHub OAuth                                          |
-| **Database**       | PostgreSQL (via Prisma ORM)                                            |
+| **Database**       | PostgreSQL via Prisma ORM (Supabase in production)                     |
 | **Cache**          | Redis (event store, pub/sub, rate limiting)                            |
 | **Real-time**      | WebSocket (Socket.IO)                                                  |
 | **AI**             | Claude AI (Anthropic API)                                              |
 | **Monorepo**       | pnpm workspaces + Turborepo                                            |
-| **Infrastructure** | Docker Compose (local), Vercel (frontend), Railway (backend)           |
+| **Infrastructure** | Docker Compose (local) · Vercel (frontend) · Render (backend + Redis) · Supabase (Postgres) |
 
 ---
 
@@ -277,6 +286,74 @@ pnpm build
 
 ---
 
+## Deployment
+
+The app is deployed across three platforms. The frontend and backend are on
+different domains, which drives a few of the config choices below.
+
+### Frontend → Vercel
+
+Vercel builds the Next.js app from inside the monorepo.
+
+- **Root Directory**: `apps/web` (so Next.js detection finds `next` in
+  `apps/web/package.json`)
+- **Include files outside root directory**: **ON** (needed to reach the
+  workspace root and `packages/shared`)
+- **Build config** lives in [`apps/web/vercel.json`](./apps/web/vercel.json):
+  it `cd ../..` to the workspace root, builds `@webhooklab/shared`, runs
+  `prisma generate`, then `next build`.
+- **Env vars** (Production):
+
+  | Variable               | Value / notes                                  |
+  | ---------------------- | ---------------------------------------------- |
+  | `GITHUB_CLIENT_ID`     | from the GitHub OAuth app                       |
+  | `GITHUB_CLIENT_SECRET` | from the GitHub OAuth app                       |
+  | `NEXTAUTH_URL`         | `https://webhook-lab-web.vercel.app`            |
+  | `NEXTAUTH_SECRET`      | **must match the backend's value**              |
+  | `NEXT_PUBLIC_API_URL`  | `https://webhooklab.onrender.com`               |
+  | `NEXT_PUBLIC_WS_URL`   | `https://webhooklab.onrender.com`               |
+
+- **GitHub OAuth callback URL** must be set to
+  `https://webhook-lab-web.vercel.app/api/auth/callback/github`.
+
+### Backend → Render
+
+Deployed from [`render.yaml`](./render.yaml) as a Docker web service plus a
+Render Key Value (Redis) store, both on the free plan. Set the `sync: false`
+secrets in the Render dashboard:
+
+| Variable          | Notes                                                          |
+| ----------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`    | Supabase **pooled** URL (`:6543`, `?pgbouncer=true`)          |
+| `DIRECT_URL`      | Supabase **direct** URL (`:5432`) — required by `migrate deploy` |
+| `NEXTAUTH_SECRET` | **must match the frontend's value**                           |
+| `CORS_ORIGIN`     | `https://webhook-lab-web.vercel.app` (exact, no trailing `/`) |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL` | AI payload analysis |
+
+`PORT` is injected by Render automatically — do not set it.
+
+### Database → Supabase
+
+Managed PostgreSQL. Prisma migrations are applied on each Render deploy via the
+`preDeployCommand` (`prisma migrate deploy`).
+
+### Cross-domain authentication
+
+Because the frontend (`vercel.app`) and backend (`onrender.com`) are on
+different registrable domains, the NextAuth session **cookie** is not sent to
+the backend. Instead:
+
+1. The frontend exposes [`/api/token`](./apps/web/src/app/api/token/route.ts),
+   which returns the raw NextAuth JWT.
+2. The API client ([`api-client.ts`](./apps/web/src/lib/api-client.ts)) attaches
+   it as an `Authorization: Bearer <token>` header.
+3. The backend decodes it with the **shared `NEXTAUTH_SECRET`**.
+
+> ⚠️ `NEXTAUTH_SECRET` **must be identical on Vercel and Render**, or the backend
+> cannot decode the token (you'll get `403 Invalid or expired token`).
+
+---
+
 ## Troubleshooting
 
 ### Docker containers won't start
@@ -299,6 +376,17 @@ pnpm docker:up
 1. Check backend is running on port 4000
 2. Check `NEXT_PUBLIC_WS_URL` in `apps/web/.env.local`
 3. Check browser console for connection errors
+
+### Production deployment issues
+
+| Symptom                                                | Cause / fix                                                                                     |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Vercel: `No Next.js version detected`                  | Root Directory must be `apps/web` (where `next` lives)                                          |
+| Vercel: build runs `cd apps/web && next build`         | A dashboard **Build Command override** is on; turn it off so `vercel.json` is used              |
+| Vercel: `next build` exits 1, Prisma client missing    | `prisma generate` must run before `next build` (handled in `apps/web/vercel.json`)              |
+| API preflight `OPTIONS → 500`                          | Backend `CORS_ORIGIN` missing/mismatched; set it to the exact frontend origin (no trailing `/`) |
+| API `401 Unauthorized` while logged in                 | Cross-domain cookie isn't sent — the Bearer-token flow handles this; ensure you're logged in    |
+| API `403 Invalid or expired token`                     | `NEXTAUTH_SECRET` differs between Vercel and Render — make them identical                        |
 
 ## Next Steps
 
